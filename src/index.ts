@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   console.log(`[Config] Loaded ${config.roles.length} role configuration(s)`);
 
-  initDatabase();
+  await initDatabase();
 
   const cleaned = cleanExpiredSessions();
   if (cleaned > 0) {
