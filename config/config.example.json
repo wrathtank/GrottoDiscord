@@ -1,0 +1,204 @@
+{
+  "verification": {
+    "enabled": true,
+    "requireSignature": true,
+    "refreshIntervalHours": 24,
+    "autoRevokeOnFailure": true
+  },
+  "roles": [
+    {
+      "id": "holder",
+      "name": "Token Holder",
+      "discordRoleId": "1234567890123456789",
+      "description": "Holders of our ERC20 token",
+      "image": "https://your-cdn.com/images/holder-badge.png",
+      "color": "#FFD700",
+      "requirements": [
+        {
+          "type": "erc20",
+          "contractAddress": "0x1234567890123456789012345678901234567890",
+          "minBalance": "1000000000000000000",
+          "symbol": "TOKEN",
+          "decimals": 18
+        }
+      ],
+      "successMessage": "Welcome to the Token Holders club!",
+      "assignEmbed": {
+        "title": "🎉 Token Holder Verified!",
+        "description": "You've been verified as a Token Holder and granted access to exclusive channels.",
+        "color": "#FFD700",
+        "thumbnail": "https://your-cdn.com/images/holder-badge.png",
+        "fields": [
+          {
+            "name": "Benefits",
+            "value": "• Access to holder-only channels\n• Early announcements\n• Exclusive events",
+            "inline": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "nft_holder",
+      "name": "NFT Holder",
+      "discordRoleId": "1234567890123456790",
+      "description": "Holders of our NFT collection",
+      "image": "https://your-cdn.com/images/nft-badge.png",
+      "color": "#9945FF",
+      "requirements": [
+        {
+          "type": "erc721",
+          "contractAddress": "0x2345678901234567890123456789012345678901",
+          "minBalance": "1",
+          "name": "Grotto NFT"
+        }
+      ],
+      "successMessage": "You're now a verified NFT holder!",
+      "assignEmbed": {
+        "title": "🖼️ NFT Holder Verified!",
+        "description": "Your NFT ownership has been verified!",
+        "color": "#9945FF",
+        "thumbnail": "https://your-cdn.com/images/nft-badge.png",
+        "fields": [
+          {
+            "name": "Your NFT Collection",
+            "value": "Grotto NFT",
+            "inline": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "staker",
+      "name": "Staker",
+      "discordRoleId": "1234567890123456791",
+      "description": "Users staking in our contract",
+      "image": "https://your-cdn.com/images/staker-badge.png",
+      "color": "#00FF88",
+      "requirements": [
+        {
+          "type": "staked",
+          "contractAddress": "0x3456789012345678901234567890123456789012",
+          "method": "stakedBalance",
+          "minBalance": "100000000000000000000",
+          "symbol": "sTOKEN",
+          "decimals": 18
+        }
+      ],
+      "successMessage": "Welcome, Staker! Thank you for supporting the network.",
+      "assignEmbed": {
+        "title": "🔒 Staker Verified!",
+        "description": "Your staked tokens have been verified!",
+        "color": "#00FF88",
+        "thumbnail": "https://your-cdn.com/images/staker-badge.png",
+        "fields": [
+          {
+            "name": "Minimum Stake Required",
+            "value": "100 sTOKEN",
+            "inline": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "erc1155_holder",
+      "name": "Badge Holder",
+      "discordRoleId": "1234567890123456792",
+      "description": "Holders of our ERC1155 badges",
+      "image": "https://your-cdn.com/images/badge-holder.png",
+      "color": "#FF6B6B",
+      "requirements": [
+        {
+          "type": "erc1155",
+          "contractAddress": "0x4567890123456789012345678901234567890123",
+          "tokenId": "1",
+          "minBalance": "1",
+          "name": "Grotto Badge"
+        }
+      ],
+      "successMessage": "Badge holder status confirmed!",
+      "assignEmbed": {
+        "title": "🏅 Badge Holder Verified!",
+        "description": "Your ERC1155 badge ownership has been verified!",
+        "color": "#FF6B6B",
+        "thumbnail": "https://your-cdn.com/images/badge-holder.png"
+      }
+    },
+    {
+      "id": "erc404_holder",
+      "name": "Hybrid Asset Holder",
+      "discordRoleId": "1234567890123456793",
+      "description": "Holders of our ERC404 hybrid assets",
+      "image": "https://your-cdn.com/images/hybrid-badge.png",
+      "color": "#4ECDC4",
+      "requirements": [
+        {
+          "type": "erc404",
+          "contractAddress": "0x5678901234567890123456789012345678901234",
+          "minBalance": "1000000000000000000",
+          "symbol": "HYBRID",
+          "decimals": 18
+        }
+      ],
+      "successMessage": "Hybrid asset holder verified!",
+      "assignEmbed": {
+        "title": "💎 Hybrid Asset Holder Verified!",
+        "description": "Your ERC404 tokens have been verified!",
+        "color": "#4ECDC4",
+        "thumbnail": "https://your-cdn.com/images/hybrid-badge.png"
+      }
+    },
+    {
+      "id": "whale",
+      "name": "Whale",
+      "discordRoleId": "1234567890123456794",
+      "description": "Large holders with multiple requirements",
+      "image": "https://your-cdn.com/images/whale-badge.png",
+      "color": "#1E90FF",
+      "requireAll": true,
+      "requirements": [
+        {
+          "type": "erc20",
+          "contractAddress": "0x1234567890123456789012345678901234567890",
+          "minBalance": "100000000000000000000000",
+          "symbol": "TOKEN",
+          "decimals": 18
+        },
+        {
+          "type": "erc721",
+          "contractAddress": "0x2345678901234567890123456789012345678901",
+          "minBalance": "5",
+          "name": "Grotto NFT"
+        }
+      ],
+      "successMessage": "Welcome, Whale! You've achieved elite status.",
+      "assignEmbed": {
+        "title": "🐋 Whale Status Achieved!",
+        "description": "You've been recognized as a major holder!",
+        "color": "#1E90FF",
+        "thumbnail": "https://your-cdn.com/images/whale-badge.png",
+        "fields": [
+          {
+            "name": "Requirements Met",
+            "value": "• 100,000+ TOKEN\n• 5+ Grotto NFTs",
+            "inline": false
+          }
+        ]
+      }
+    }
+  ],
+  "customAbis": {
+    "staking": [
+      "function stakedBalance(address account) view returns (uint256)",
+      "function getStakedAmount(address account) view returns (uint256)",
+      "function userStake(address account) view returns (uint256)"
+    ]
+  },
+  "messages": {
+    "verificationStart": "Click the button below to start the verification process.",
+    "walletConnected": "Wallet connected! Checking your holdings...",
+    "verificationSuccess": "Verification complete! Your roles have been updated.",
+    "verificationFailed": "Verification failed. You don't meet the requirements for any roles.",
+    "alreadyVerified": "You already have a wallet linked. Use /unlink to remove it first.",
+    "notLinked": "You don't have a wallet linked. Use /verify to link one."
+  }
+}
