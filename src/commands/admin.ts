@@ -105,7 +105,7 @@ async function handleStats(
   config: BotConfig
 ) {
   const allWallets = getAllLinkedWallets();
-  const networkInfo = await blockchain.getNetworkInfo();
+  const chainNames = blockchain.getChainNames();
 
   const embed = new EmbedBuilder()
     .setTitle('📈 Bot Statistics')
@@ -113,10 +113,27 @@ async function handleStats(
     .addFields(
       { name: 'Linked Wallets', value: allWallets.length.toString(), inline: true },
       { name: 'Configured Roles', value: config.roles.length.toString(), inline: true },
-      { name: 'Chain ID', value: networkInfo.chainId.toString(), inline: true },
-      { name: 'Current Block', value: networkInfo.blockNumber.toString(), inline: true }
+      { name: 'Configured Chains', value: chainNames.join(', '), inline: true }
     )
     .setTimestamp();
+
+  // Add info for each chain
+  for (const chainName of chainNames) {
+    try {
+      const info = await blockchain.getNetworkInfo(chainName);
+      embed.addFields({
+        name: `${info.name} (${chainName})`,
+        value: `Chain ID: ${info.chainId}\nBlock: ${info.blockNumber}`,
+        inline: true,
+      });
+    } catch {
+      embed.addFields({
+        name: chainName,
+        value: '❌ Error fetching info',
+        inline: true,
+      });
+    }
+  }
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
@@ -129,22 +146,28 @@ async function handleHealth(
 
   const health = await blockchain.healthCheck();
 
+  let allHealthy = true;
+  let anyHealthy = false;
+
   const embed = new EmbedBuilder()
     .setTitle('🏥 RPC Health Check')
-    .setColor(health.primary && health.secondary ? 0x00ff00 : health.primary || health.secondary ? 0xffa500 : 0xff0000)
-    .addFields(
-      {
-        name: 'Primary RPC',
-        value: health.primary ? '✅ Online' : '❌ Offline',
-        inline: true,
-      },
-      {
-        name: 'Secondary RPC',
-        value: health.secondary ? '✅ Online' : '❌ Offline',
-        inline: true,
-      }
-    )
     .setTimestamp();
+
+  for (const [chainKey, status] of Object.entries(health)) {
+    const primaryStatus = status.primary ? '✅' : '❌';
+    const secondaryStatus = status.secondary ? '✅' : '❌';
+
+    if (!status.primary) allHealthy = false;
+    if (status.primary || status.secondary) anyHealthy = true;
+
+    embed.addFields({
+      name: `${status.name} (${chainKey})`,
+      value: `Primary: ${primaryStatus}\nSecondary: ${secondaryStatus}`,
+      inline: true,
+    });
+  }
+
+  embed.setColor(allHealthy ? 0x00ff00 : anyHealthy ? 0xffa500 : 0xff0000);
 
   await interaction.editReply({ embeds: [embed] });
 }

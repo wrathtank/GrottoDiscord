@@ -20,6 +20,7 @@ export interface TokenRequirement {
   type: RequirementType;
   contractAddress: string;
   minBalance: string;
+  chainId?: string;  // Which chain to check (matches key in chains config)
   symbol?: string;
   decimals?: number;
   name?: string;
@@ -56,8 +57,16 @@ export interface MessagesConfig {
   notLinked: string;
 }
 
+export interface ChainConfig {
+  name: string;
+  chainId: number;
+  rpcPrimary: string;
+  rpcSecondary?: string;
+}
+
 export interface BotConfig {
   verification: VerificationConfig;
+  chains: Record<string, ChainConfig>;  // Key is chain identifier (e.g., "avax", "grotto")
   roles: RoleConfig[];
   customAbis?: Record<string, string[]>;
   messages: MessagesConfig;

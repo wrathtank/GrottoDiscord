@@ -10,7 +10,7 @@ import {
   ModalSubmitInteraction,
 } from 'discord.js';
 import { BlockchainService } from './services/blockchain';
-import { BotConfig, RpcConfig } from './types';
+import { BotConfig } from './types';
 import { commands, commandData } from './commands';
 
 export class GrottoBot {
@@ -24,7 +24,6 @@ export class GrottoBot {
   constructor(
     token: string,
     clientId: string,
-    rpcConfig: RpcConfig,
     botConfig: BotConfig,
     guildId?: string
   ) {
@@ -40,7 +39,7 @@ export class GrottoBot {
       ],
     });
 
-    this.blockchain = new BlockchainService(rpcConfig, botConfig.customAbis);
+    this.blockchain = new BlockchainService(botConfig.chains, botConfig.customAbis);
 
     this.setupEventHandlers();
   }

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { GrottoBot } from './bot';
 import { initDatabase, cleanExpiredSessions } from './database';
-import { BotConfig, RpcConfig } from './types';
+import { BotConfig } from './types';
 
 function loadConfig(): BotConfig {
   // First, try loading from BOT_CONFIG environment variable (for Heroku/cloud)
@@ -37,7 +37,7 @@ function loadConfig(): BotConfig {
 }
 
 function validateEnv(): void {
-  const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'RPC_URL_PRIMARY', 'RPC_URL_SECONDARY'];
+  const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID'];
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
@@ -45,6 +45,26 @@ function validateEnv(): void {
     missing.forEach((key) => console.error(`  - ${key}`));
     console.error('[Env] Copy .env.example to .env and configure it.');
     process.exit(1);
+  }
+}
+
+function validateConfig(config: BotConfig): void {
+  if (!config.chains || Object.keys(config.chains).length === 0) {
+    console.error('[Config] No chains configured!');
+    console.error('[Config] Add at least one chain to the "chains" section of your config.');
+    process.exit(1);
+  }
+
+  // Validate each chain has required fields
+  for (const [chainKey, chain] of Object.entries(config.chains)) {
+    if (!chain.rpcPrimary) {
+      console.error(`[Config] Chain "${chainKey}" is missing rpcPrimary`);
+      process.exit(1);
+    }
+    if (!chain.chainId) {
+      console.error(`[Config] Chain "${chainKey}" is missing chainId`);
+      process.exit(1);
+    }
   }
 }
 
@@ -56,7 +76,10 @@ async function main(): Promise<void> {
   validateEnv();
 
   const config = loadConfig();
-  console.log(`[Config] Loaded ${config.roles.length} role configuration(s)`);
+  validateConfig(config);
+
+  const chainCount = Object.keys(config.chains).length;
+  console.log(`[Config] Loaded ${config.roles.length} role(s) across ${chainCount} chain(s)`);
 
   await initDatabase();
 
@@ -65,16 +88,9 @@ async function main(): Promise<void> {
     console.log(`[Database] Cleaned ${cleaned} expired session(s)`);
   }
 
-  const rpcConfig: RpcConfig = {
-    primary: process.env.RPC_URL_PRIMARY!,
-    secondary: process.env.RPC_URL_SECONDARY!,
-    chainId: parseInt(process.env.CHAIN_ID || '1'),
-  };
-
   const bot = new GrottoBot(
     process.env.DISCORD_TOKEN!,
     process.env.DISCORD_CLIENT_ID!,
-    rpcConfig,
     config,
     process.env.DISCORD_GUILD_ID
   );

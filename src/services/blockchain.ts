@@ -4,7 +4,7 @@ import {
   RequirementResult,
   VerificationResult,
   RoleConfig,
-  RpcConfig,
+  ChainConfig,
 } from '../types';
 
 const ERC20_ABI = [
@@ -29,48 +29,84 @@ const ERC404_ABI = [
   'function erc721BalanceOf(address owner) view returns (uint256)',
 ];
 
-export class BlockchainService {
-  private primaryProvider: JsonRpcProvider;
-  private secondaryProvider: JsonRpcProvider;
-  private currentProvider: JsonRpcProvider;
-  private customAbis: Record<string, string[]>;
-  private rpcConfig: RpcConfig;
+interface ChainProviders {
+  primary: JsonRpcProvider;
+  secondary?: JsonRpcProvider;
+  config: ChainConfig;
+}
 
-  constructor(rpcConfig: RpcConfig, customAbis?: Record<string, string[]>) {
-    this.rpcConfig = rpcConfig;
-    this.primaryProvider = new JsonRpcProvider(rpcConfig.primary, rpcConfig.chainId);
-    this.secondaryProvider = new JsonRpcProvider(rpcConfig.secondary, rpcConfig.chainId);
-    this.currentProvider = this.primaryProvider;
+export class BlockchainService {
+  private chains: Map<string, ChainProviders> = new Map();
+  private defaultChain: string;
+  private customAbis: Record<string, string[]>;
+
+  constructor(
+    chainsConfig: Record<string, ChainConfig>,
+    customAbis?: Record<string, string[]>
+  ) {
     this.customAbis = customAbis || {};
 
-    console.log('[Blockchain] Service initialized with dual RPC endpoints');
+    // Initialize providers for each chain
+    const chainKeys = Object.keys(chainsConfig);
+    if (chainKeys.length === 0) {
+      throw new Error('At least one chain must be configured');
+    }
+
+    this.defaultChain = chainKeys[0];
+
+    for (const [chainKey, config] of Object.entries(chainsConfig)) {
+      const primary = new JsonRpcProvider(config.rpcPrimary, config.chainId);
+      const secondary = config.rpcSecondary
+        ? new JsonRpcProvider(config.rpcSecondary, config.chainId)
+        : undefined;
+
+      this.chains.set(chainKey, { primary, secondary, config });
+      console.log(`[Blockchain] Initialized chain "${chainKey}" (${config.name}) - Chain ID: ${config.chainId}`);
+    }
+
+    console.log(`[Blockchain] Service initialized with ${this.chains.size} chain(s)`);
   }
 
-  private async withFallback<T>(operation: (provider: JsonRpcProvider) => Promise<T>): Promise<T> {
+  private getProviders(chainId?: string): ChainProviders {
+    const key = chainId || this.defaultChain;
+    const providers = this.chains.get(key);
+    if (!providers) {
+      throw new Error(`Chain "${key}" not configured. Available chains: ${Array.from(this.chains.keys()).join(', ')}`);
+    }
+    return providers;
+  }
+
+  private async withFallback<T>(
+    chainId: string | undefined,
+    operation: (provider: JsonRpcProvider) => Promise<T>
+  ): Promise<T> {
+    const { primary, secondary } = this.getProviders(chainId);
+
     try {
-      return await operation(this.primaryProvider);
+      return await operation(primary);
     } catch (primaryError) {
-      console.warn('[Blockchain] Primary RPC failed, switching to secondary:', primaryError);
-      try {
-        const result = await operation(this.secondaryProvider);
-        this.currentProvider = this.secondaryProvider;
-        return result;
-      } catch (secondaryError) {
-        console.error('[Blockchain] Both RPCs failed');
-        throw new Error('All RPC endpoints failed');
+      if (secondary) {
+        console.warn(`[Blockchain] Primary RPC failed for chain "${chainId || this.defaultChain}", trying secondary`);
+        try {
+          return await operation(secondary);
+        } catch (secondaryError) {
+          console.error(`[Blockchain] Both RPCs failed for chain "${chainId || this.defaultChain}"`);
+          throw new Error(`All RPC endpoints failed for chain "${chainId || this.defaultChain}"`);
+        }
       }
+      throw primaryError;
     }
   }
 
-  async getERC20Balance(contractAddress: string, walletAddress: string): Promise<bigint> {
-    return this.withFallback(async (provider) => {
+  async getERC20Balance(contractAddress: string, walletAddress: string, chainId?: string): Promise<bigint> {
+    return this.withFallback(chainId, async (provider) => {
       const contract = new Contract(contractAddress, ERC20_ABI, provider);
       return await contract.balanceOf(walletAddress);
     });
   }
 
-  async getERC721Balance(contractAddress: string, walletAddress: string): Promise<bigint> {
-    return this.withFallback(async (provider) => {
+  async getERC721Balance(contractAddress: string, walletAddress: string, chainId?: string): Promise<bigint> {
+    return this.withFallback(chainId, async (provider) => {
       const contract = new Contract(contractAddress, ERC721_ABI, provider);
       return await contract.balanceOf(walletAddress);
     });
@@ -79,16 +115,17 @@ export class BlockchainService {
   async getERC1155Balance(
     contractAddress: string,
     walletAddress: string,
-    tokenId: string
+    tokenId: string,
+    chainId?: string
   ): Promise<bigint> {
-    return this.withFallback(async (provider) => {
+    return this.withFallback(chainId, async (provider) => {
       const contract = new Contract(contractAddress, ERC1155_ABI, provider);
       return await contract.balanceOf(walletAddress, tokenId);
     });
   }
 
-  async getERC404Balance(contractAddress: string, walletAddress: string): Promise<bigint> {
-    return this.withFallback(async (provider) => {
+  async getERC404Balance(contractAddress: string, walletAddress: string, chainId?: string): Promise<bigint> {
+    return this.withFallback(chainId, async (provider) => {
       const contract = new Contract(contractAddress, ERC404_ABI, provider);
       try {
         return await contract.erc20BalanceOf(walletAddress);
@@ -101,13 +138,14 @@ export class BlockchainService {
   async getStakedBalance(
     contractAddress: string,
     walletAddress: string,
-    method: string = 'stakedBalance'
+    method: string = 'stakedBalance',
+    chainId?: string
   ): Promise<bigint> {
     const stakingAbi = this.customAbis['staking'] || [
       `function ${method}(address account) view returns (uint256)`,
     ];
 
-    return this.withFallback(async (provider) => {
+    return this.withFallback(chainId, async (provider) => {
       const contract = new Contract(contractAddress, stakingAbi, provider);
 
       if (typeof contract[method] === 'function') {
@@ -134,14 +172,15 @@ export class BlockchainService {
     walletAddress: string
   ): Promise<RequirementResult> {
     let actualBalance: bigint;
+    const chainId = requirement.chainId;
 
     try {
       switch (requirement.type) {
         case 'erc20':
-          actualBalance = await this.getERC20Balance(requirement.contractAddress, walletAddress);
+          actualBalance = await this.getERC20Balance(requirement.contractAddress, walletAddress, chainId);
           break;
         case 'erc721':
-          actualBalance = await this.getERC721Balance(requirement.contractAddress, walletAddress);
+          actualBalance = await this.getERC721Balance(requirement.contractAddress, walletAddress, chainId);
           break;
         case 'erc1155':
           if (!requirement.tokenId) {
@@ -150,17 +189,19 @@ export class BlockchainService {
           actualBalance = await this.getERC1155Balance(
             requirement.contractAddress,
             walletAddress,
-            requirement.tokenId
+            requirement.tokenId,
+            chainId
           );
           break;
         case 'erc404':
-          actualBalance = await this.getERC404Balance(requirement.contractAddress, walletAddress);
+          actualBalance = await this.getERC404Balance(requirement.contractAddress, walletAddress, chainId);
           break;
         case 'staked':
           actualBalance = await this.getStakedBalance(
             requirement.contractAddress,
             walletAddress,
-            requirement.method
+            requirement.method,
+            chainId
           );
           break;
         default:
@@ -178,7 +219,7 @@ export class BlockchainService {
         passed,
       };
     } catch (error) {
-      console.error(`[Blockchain] Error checking requirement:`, error);
+      console.error(`[Blockchain] Error checking requirement on chain "${chainId || this.defaultChain}":`, error);
       return {
         type: requirement.type,
         contractAddress: requirement.contractAddress,
@@ -253,32 +294,46 @@ export class BlockchainService {
     }
   }
 
-  async getNetworkInfo(): Promise<{ chainId: number; blockNumber: number }> {
-    return this.withFallback(async (provider) => {
+  async getNetworkInfo(chainId?: string): Promise<{ chainId: number; blockNumber: number; name: string }> {
+    const { config } = this.getProviders(chainId);
+    return this.withFallback(chainId, async (provider) => {
       const network = await provider.getNetwork();
       const blockNumber = await provider.getBlockNumber();
       return {
         chainId: Number(network.chainId),
         blockNumber,
+        name: config.name,
       };
     });
   }
 
-  async healthCheck(): Promise<{ primary: boolean; secondary: boolean }> {
-    const checkProvider = async (provider: JsonRpcProvider): Promise<boolean> => {
-      try {
-        await provider.getBlockNumber();
-        return true;
-      } catch {
-        return false;
-      }
-    };
+  async healthCheck(): Promise<Record<string, { primary: boolean; secondary: boolean; name: string }>> {
+    const results: Record<string, { primary: boolean; secondary: boolean; name: string }> = {};
 
-    const [primary, secondary] = await Promise.all([
-      checkProvider(this.primaryProvider),
-      checkProvider(this.secondaryProvider),
-    ]);
+    for (const [chainKey, { primary, secondary, config }] of this.chains) {
+      const checkProvider = async (provider: JsonRpcProvider): Promise<boolean> => {
+        try {
+          await provider.getBlockNumber();
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
-    return { primary, secondary };
+      const primaryOk = await checkProvider(primary);
+      const secondaryOk = secondary ? await checkProvider(secondary) : true;
+
+      results[chainKey] = {
+        primary: primaryOk,
+        secondary: secondaryOk,
+        name: config.name,
+      };
+    }
+
+    return results;
+  }
+
+  getChainNames(): string[] {
+    return Array.from(this.chains.keys());
   }
 }
