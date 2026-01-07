@@ -12,7 +12,15 @@ A secure, plug-and-play Discord bot for verifying on-chain token and NFT holding
 - **Admin Dashboard**: Stats, health checks, and bulk refresh capabilities
 - **Persistent Storage**: SQLite database for wallet links and sessions
 
-## Quick Start
+## Deployment Options
+
+| Platform | Guide | Difficulty |
+|----------|-------|------------|
+| **Heroku** | [HEROKU.md](./HEROKU.md) | Easy |
+| **Local/VPS** | Below | Medium |
+| **Docker** | Coming soon | Easy |
+
+## Quick Start (Local/VPS)
 
 ### 1. Prerequisites
 

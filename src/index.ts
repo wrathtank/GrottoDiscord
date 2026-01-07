@@ -6,15 +6,28 @@ import { initDatabase, cleanExpiredSessions } from './database';
 import { BotConfig, RpcConfig } from './types';
 
 function loadConfig(): BotConfig {
+  // First, try loading from BOT_CONFIG environment variable (for Heroku/cloud)
+  if (process.env.BOT_CONFIG) {
+    try {
+      console.log('[Config] Loading from BOT_CONFIG environment variable');
+      return JSON.parse(process.env.BOT_CONFIG) as BotConfig;
+    } catch (error) {
+      console.error('[Config] Failed to parse BOT_CONFIG env var:', error);
+      process.exit(1);
+    }
+  }
+
+  // Fall back to config file (for local development)
   const configPath = path.join(process.cwd(), 'config', 'config.json');
 
   if (!fs.existsSync(configPath)) {
-    console.error('[Config] config/config.json not found!');
-    console.error('[Config] Copy config/config.example.json to config/config.json and configure it.');
+    console.error('[Config] No configuration found!');
+    console.error('[Config] Either set BOT_CONFIG env var or copy config/config.example.json to config/config.json');
     process.exit(1);
   }
 
   try {
+    console.log('[Config] Loading from config/config.json');
     const configData = fs.readFileSync(configPath, 'utf-8');
     return JSON.parse(configData) as BotConfig;
   } catch (error) {

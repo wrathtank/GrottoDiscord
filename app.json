@@ -1,0 +1,51 @@
+{
+  "name": "Grotto Discord Bot",
+  "description": "Discord bot for verifying token/NFT holdings and assigning roles",
+  "keywords": ["discord", "bot", "nft", "erc20", "erc721", "verification"],
+  "repository": "https://github.com/your-org/GrottoDiscord",
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "env": {
+    "DISCORD_TOKEN": {
+      "description": "Your Discord bot token from the Developer Portal",
+      "required": true
+    },
+    "DISCORD_CLIENT_ID": {
+      "description": "Your Discord application client ID",
+      "required": true
+    },
+    "DISCORD_GUILD_ID": {
+      "description": "Your Discord server ID (for guild-specific commands)",
+      "required": false
+    },
+    "RPC_URL_PRIMARY": {
+      "description": "Primary RPC endpoint URL",
+      "required": true
+    },
+    "RPC_URL_SECONDARY": {
+      "description": "Secondary/fallback RPC endpoint URL",
+      "required": true
+    },
+    "CHAIN_ID": {
+      "description": "Blockchain chain ID (1 for Ethereum mainnet)",
+      "value": "1"
+    },
+    "VERIFICATION_EXPIRY_MINUTES": {
+      "description": "How long verification sessions last",
+      "value": "10"
+    },
+    "BOT_CONFIG": {
+      "description": "JSON string of bot configuration (roles, messages, etc.)",
+      "required": true
+    }
+  }
+}

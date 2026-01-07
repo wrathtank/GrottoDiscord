@@ -3,7 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { LinkedWallet, VerificationSession } from '../types';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+// Determine database location based on environment
+const isHeroku = !!process.env.DYNO;
+const DATA_DIR = process.env.DATABASE_PATH || (isHeroku ? '/tmp' : path.join(process.cwd(), 'data'));
 const DB_PATH = path.join(DATA_DIR, 'grotto.db');
 
 let db: Database.Database;
@@ -13,8 +15,17 @@ export function initDatabase(): void {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
+  // Warn about ephemeral storage on Heroku
+  if (isHeroku && !process.env.DATABASE_PATH) {
+    console.warn('[Database] WARNING: Running on Heroku with ephemeral storage!');
+    console.warn('[Database] Wallet links will be lost when dyno restarts.');
+    console.warn('[Database] Consider using a persistent database addon.');
+  }
+
   db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+
+  // Use DELETE journal mode on Heroku (WAL can cause issues with ephemeral storage)
+  db.pragma(isHeroku ? 'journal_mode = DELETE' : 'journal_mode = WAL');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS linked_wallets (
