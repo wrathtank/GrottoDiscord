@@ -21,9 +21,25 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
 
   const app = express();
 
-  // Enable CORS for all origins (needed for web verification)
+  // Enable CORS for verification domain only
+  const allowedOrigins = [
+    process.env.VERIFY_WEB_URL || 'https://grotto-verify.vercel.app',
+    'http://localhost:3000', // Local development
+    'http://localhost:5173', // Vite dev server
+  ].filter(Boolean);
+
   app.use(cors({
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+        callback(null, true);
+      } else {
+        console.warn(`[API] Blocked CORS request from: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }));
