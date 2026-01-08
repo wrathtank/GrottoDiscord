@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Grotto - Wallet Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Fire particles container -->
+  <div id="particles"></div>
+
+  <!-- Blood drip effect -->
+  <div class="blood-drips">
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+  </div>
+
+  <!-- Main content -->
+  <div class="container">
+    <div class="logo-container">
+      <img src="images/grotto-skull.png" alt="The Grotto" class="logo glitch" data-text="GROTTO">
+    </div>
+
+    <h1 class="glitch-text" data-text="THE GROTTO">THE GROTTO</h1>
+    <p class="subtitle">WALLET VERIFICATION</p>
+
+    <!-- Verification Card -->
+    <div class="card">
+      <div id="step-connect" class="step active">
+        <h2>CONNECT YOUR WALLET</h2>
+        <p>Link your wallet to verify your holdings</p>
+        <button id="btn-connect" class="btn-fire">
+          <span>CONNECT WALLET</span>
+        </button>
+      </div>
+
+      <div id="step-sign" class="step">
+        <h2>SIGN MESSAGE</h2>
+        <p>Sign to prove wallet ownership</p>
+        <div class="message-box">
+          <code id="sign-message"></code>
+        </div>
+        <button id="btn-sign" class="btn-fire">
+          <span>SIGN MESSAGE</span>
+        </button>
+      </div>
+
+      <div id="step-success" class="step">
+        <h2 class="success-text">VERIFICATION COMPLETE</h2>
+        <p>Your wallet has been verified!</p>
+        <div class="wallet-display">
+          <span id="verified-wallet"></span>
+        </div>
+        <p class="return-text">Return to Discord and click "Submit" to complete verification</p>
+        <div class="signature-box">
+          <p>Your signature (copy this):</p>
+          <textarea id="signature-output" readonly></textarea>
+          <button id="btn-copy" class="btn-secondary">COPY SIGNATURE</button>
+        </div>
+      </div>
+
+      <div id="step-error" class="step">
+        <h2 class="error-text">ERROR</h2>
+        <p id="error-message"></p>
+        <button id="btn-retry" class="btn-fire">
+          <span>TRY AGAIN</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Connected wallet display -->
+    <div id="wallet-info" class="wallet-info hidden">
+      <span class="wallet-label">Connected:</span>
+      <span id="wallet-address" class="wallet-address"></span>
+    </div>
+  </div>
+
+  <!-- Floating skulls background -->
+  <div class="floating-skulls">
+    <img src="images/grotto-skull.png" class="floating-skull skull-1" alt="">
+    <img src="images/grotto-skull.png" class="floating-skull skull-2" alt="">
+    <img src="images/grotto-skull.png" class="floating-skull skull-3" alt="">
+  </div>
+
+  <!-- Custom cursor -->
+  <div id="cursor" class="custom-cursor"></div>
+  <div id="cursor-trail"></div>
+
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

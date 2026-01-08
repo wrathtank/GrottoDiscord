@@ -66,24 +66,26 @@ export async function execute(
     .setFooter({ text: `Session expires in ${expiryMinutes} minutes • ID: ${sessionId.slice(0, 8)}` });
 
   if (config.verification.requireSignature) {
+    // Build the web verification URL
+    const webUrl = process.env.VERIFY_WEB_URL || 'https://grotto-verify.vercel.app';
+    const verifyLink = `${webUrl}?nonce=${nonce}&timestamp=${timestamp}`;
+
     embed.addFields(
       {
-        name: '📋 Step 1: Copy This Message',
-        value: `\`\`\`\n${message}\n\`\`\``,
+        name: '🔥 Step 1: Open Verification Page',
+        value: `**[Click here to verify your wallet](${verifyLink})**`,
         inline: false,
       },
       {
-        name: '✍️ Step 2: Sign on Snowtrace',
-        value: '**[Click here to open Snowtrace Signature Tool](https://snowtrace.io/verifiedSignatures#702be282)**\n\n' +
-          '• Click **"Connect to Web3"** and connect your wallet\n' +
-          '• Paste the message from Step 1 into the **"Message"** box\n' +
-          '• Click **"Sign Message"** and approve in your wallet\n' +
-          '• Copy the **entire signature** that appears (starts with 0x)',
+        name: '🔗 Step 2: Connect & Sign',
+        value: '• Connect your wallet (MetaMask, etc.)\n' +
+          '• Click "Sign Message" and approve\n' +
+          '• Copy the signature when complete',
         inline: false,
       },
       {
         name: '✅ Step 3: Submit Below',
-        value: 'Click the button and paste:\n• Your wallet address (0x...)\n• The signature you copied from Snowtrace',
+        value: 'Click the button and paste:\n• Your wallet address\n• The signature you copied',
         inline: false,
       }
     );
