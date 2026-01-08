@@ -140,17 +140,20 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       await deleteVerificationSession(sessionId);
 
       // Verify roles and assign them (with retry for cold start RPC issues)
+      console.log(`[API] Checking ${config.roles.length} role(s) for wallet ${walletAddress.slice(0, 8)}...`);
       let results = await blockchain.verifyAllRoles(config.roles, walletAddress);
+      console.log(`[API] Initial check results:`, results.map(r => ({ role: r.roleName, qualified: r.qualified, details: r.details })));
       let qualifiedRoles = results.filter((r) => r.qualified);
 
       // If no roles qualified on first try, wait a moment and retry once
       // This handles RPC cold start issues
       if (qualifiedRoles.length === 0 && config.roles.length > 0) {
-        console.log(`[API] No roles qualified on first check for ${walletAddress.slice(0, 8)}..., retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log(`[API] No roles qualified on first check, retrying in 2s...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
         results = await blockchain.verifyAllRoles(config.roles, walletAddress);
+        console.log(`[API] Retry results:`, results.map(r => ({ role: r.roleName, qualified: r.qualified, details: r.details })));
         qualifiedRoles = results.filter((r) => r.qualified);
-        console.log(`[API] Retry result: ${qualifiedRoles.length} role(s) qualified`);
+        console.log(`[API] Retry: ${qualifiedRoles.length} role(s) qualified`);
       }
 
       // Get the guild and member
