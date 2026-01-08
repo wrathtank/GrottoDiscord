@@ -130,7 +130,7 @@ body {
 
 /* Glitch text effect */
 .glitch-text {
-  font-family: 'Creepster', cursive;
+  font-family: 'Another Danger', cursive;
   font-size: 4rem;
   color: var(--white);
   text-shadow: var(--glow);
@@ -268,7 +268,7 @@ body {
 }
 
 .step h2 {
-  font-family: 'Creepster', cursive;
+  font-family: 'Another Danger', cursive;
   font-size: 1.8rem;
   color: var(--red);
   margin-bottom: 15px;
