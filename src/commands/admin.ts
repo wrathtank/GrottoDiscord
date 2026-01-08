@@ -290,7 +290,11 @@ async function handleRefreshAll(
 
   await interaction.deferReply({ ephemeral: true });
 
-  const guild = interaction.guild;
+  // Try interaction.guild first, then fetch as fallback
+  let guild = interaction.guild;
+  if (!guild && process.env.DISCORD_GUILD_ID) {
+    guild = await interaction.client.guilds.fetch(process.env.DISCORD_GUILD_ID).catch(() => null);
+  }
   if (!guild) {
     await interaction.editReply({ content: '❌ Could not find guild.' });
     return;
