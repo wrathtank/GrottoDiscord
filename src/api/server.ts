@@ -21,12 +21,39 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
 
   const app = express();
 
-  app.use(cors());
+  // Enable CORS for all origins (needed for web verification)
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+
+  // Handle preflight requests
+  app.options('*', cors());
+
   app.use(express.json());
+
+  // Root endpoint - test if API is reachable
+  app.get('/', (req: Request, res: Response) => {
+    res.json({
+      status: 'ok',
+      service: 'Grotto Discord Verification API',
+      timestamp: Date.now()
+    });
+  });
 
   // Health check
   app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: Date.now() });
+  });
+
+  // Test endpoint for verification
+  app.get('/api/verify', (req: Request, res: Response) => {
+    res.json({
+      status: 'ok',
+      message: 'Verification API is running. Use POST to verify.',
+      timestamp: Date.now()
+    });
   });
 
   // Verification endpoint
