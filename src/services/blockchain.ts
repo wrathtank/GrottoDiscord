@@ -149,14 +149,24 @@ export class BlockchainService {
       const contract = new Contract(contractAddress, stakingAbi, provider);
 
       if (typeof contract[method] === 'function') {
-        return await contract[method](walletAddress);
+        const result = await contract[method](walletAddress);
+        // Handle tuple returns (e.g., stakers mapping returns multiple values)
+        // The first value is typically the staked amount
+        if (Array.isArray(result)) {
+          return BigInt(result[0]);
+        }
+        return BigInt(result);
       }
 
       for (const abiEntry of stakingAbi) {
         const match = abiEntry.match(/function (\w+)\(/);
         if (match && typeof contract[match[1]] === 'function') {
           try {
-            return await contract[match[1]](walletAddress);
+            const result = await contract[match[1]](walletAddress);
+            if (Array.isArray(result)) {
+              return BigInt(result[0]);
+            }
+            return BigInt(result);
           } catch {
             continue;
           }
