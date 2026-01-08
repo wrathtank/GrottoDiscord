@@ -29,7 +29,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       '╚══════════════════════════╝'
     )
     .setColor(0x8b0000)
-    .setThumbnail('https://i.imgur.com/YourLogo.png') // Replace with your logo
     .addFields(
       {
         name: '⛧ HOW TO VERIFY ⛧',
@@ -63,7 +62,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         inline: false,
       }
     )
-    .setImage('https://i.imgur.com/YourBanner.png') // Replace with your banner
     .setFooter({ text: '🦴 GGrotto! • Descend into the darkness...' })
     .setTimestamp();
 
