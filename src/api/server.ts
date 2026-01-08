@@ -139,9 +139,19 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       await linkWallet(session.discordId, walletAddress, signature, session.nonce);
       await deleteVerificationSession(sessionId);
 
-      // Verify roles and assign them
-      const results = await blockchain.verifyAllRoles(config.roles, walletAddress);
-      const qualifiedRoles = results.filter((r) => r.qualified);
+      // Verify roles and assign them (with retry for cold start RPC issues)
+      let results = await blockchain.verifyAllRoles(config.roles, walletAddress);
+      let qualifiedRoles = results.filter((r) => r.qualified);
+
+      // If no roles qualified on first try, wait a moment and retry once
+      // This handles RPC cold start issues
+      if (qualifiedRoles.length === 0 && config.roles.length > 0) {
+        console.log(`[API] No roles qualified on first check for ${walletAddress.slice(0, 8)}..., retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        results = await blockchain.verifyAllRoles(config.roles, walletAddress);
+        qualifiedRoles = results.filter((r) => r.qualified);
+        console.log(`[API] Retry result: ${qualifiedRoles.length} role(s) qualified`);
+      }
 
       // Get the guild and member
       const guildId = process.env.DISCORD_GUILD_ID;
