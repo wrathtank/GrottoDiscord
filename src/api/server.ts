@@ -24,6 +24,10 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   // Enable CORS for verification domain only
   const allowedOrigins = [
     process.env.VERIFY_WEB_URL || 'https://grotto-verify.vercel.app',
+    'https://ggrotto.xyz',
+    'https://www.ggrotto.xyz',
+    'https://enterthegrotto.xyz',
+    'https://www.enterthegrotto.xyz',
     'http://localhost:3000', // Local development
     'http://localhost:5173', // Vite dev server
   ].filter(Boolean);
