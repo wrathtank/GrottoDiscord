@@ -11,7 +11,19 @@ const urlParams = new URLSearchParams(window.location.search);
 const sessionId = urlParams.get('session');
 const nonce = urlParams.get('nonce') || generateNonce();
 const timestamp = urlParams.get('timestamp') || Date.now();
-const apiUrl = urlParams.get('api') || '';
+let apiUrl = urlParams.get('api') || '';
+
+// Decode API URL if it was encoded
+if (apiUrl) {
+  try {
+    apiUrl = decodeURIComponent(apiUrl);
+  } catch (e) {
+    console.log('API URL already decoded');
+  }
+}
+
+// Debug logging
+console.log('Verification params:', { sessionId, nonce, timestamp, apiUrl });
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 18);
@@ -53,6 +65,7 @@ function showStep(step) {
 
 // Show error
 function showError(message) {
+  console.error('Error:', message);
   errorMessage.textContent = message;
   showStep(stepError);
 }
@@ -62,22 +75,44 @@ function formatAddress(address) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+// Check for wallet availability
+function hasWallet() {
+  return typeof window.ethereum !== 'undefined' ||
+         typeof window.web3 !== 'undefined';
+}
+
 // Connect wallet
 async function connectWallet() {
   try {
-    if (typeof window.ethereum === 'undefined') {
-      showError('No wallet detected! Please install MetaMask or another Web3 wallet.');
+    // Check for wallet
+    if (!hasWallet()) {
+      // On mobile, might need to open in wallet browser
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        showError('Please open this page in your wallet app browser (MetaMask, Trust Wallet, etc.)');
+      } else {
+        showError('No wallet detected! Please install MetaMask or another Web3 wallet.');
+      }
       return;
     }
 
     btnConnect.innerHTML = '<span>CONNECTING...</span>';
 
+    // Get ethereum provider
+    const ethereum = window.ethereum || window.web3?.currentProvider;
+
     // Request accounts
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts returned');
+    }
+
     walletAddress = accounts[0];
+    console.log('Connected wallet:', walletAddress);
 
     // Create provider and signer
-    provider = new ethers.providers.Web3Provider(window.ethereum);
+    provider = new ethers.providers.Web3Provider(ethereum);
     signer = provider.getSigner();
 
     // Update UI
@@ -93,6 +128,8 @@ async function connectWallet() {
     btnConnect.innerHTML = '<span>CONNECT WALLET</span>';
     if (error.code === 4001) {
       showError('Connection rejected. Please approve the connection request.');
+    } else if (error.message) {
+      showError(`Connection failed: ${error.message}`);
     } else {
       showError('Failed to connect wallet. Please try again.');
     }
@@ -105,7 +142,10 @@ async function signMessageWithWallet() {
     btnSign.innerHTML = '<span>SIGNING...</span>';
 
     const message = generateMessage();
+    console.log('Signing message:', message);
+
     signature = await signer.signMessage(message);
+    console.log('Got signature:', signature.slice(0, 20) + '...');
 
     // Show verifying step
     showStep(stepVerifying);
@@ -116,8 +156,10 @@ async function signMessageWithWallet() {
   } catch (error) {
     console.error('Signing error:', error);
     btnSign.innerHTML = '<span>SIGN MESSAGE</span>';
-    if (error.code === 4001) {
+    if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
       showError('Signature rejected. Please approve the signature request.');
+    } else if (error.message) {
+      showError(`Signing failed: ${error.message}`);
     } else {
       showError('Failed to sign message. Please try again.');
     }
@@ -128,10 +170,12 @@ async function signMessageWithWallet() {
 async function submitVerification() {
   try {
     if (!apiUrl || !sessionId) {
-      // No API configured, show manual fallback
-      showManualFallback();
+      console.log('No API URL or session ID, showing manual fallback');
+      showManualFallback('No API URL configured. Please use manual verification.');
       return;
     }
+
+    console.log('Submitting verification to:', apiUrl);
 
     const response = await fetch(`${apiUrl}/api/verify`, {
       method: 'POST',
@@ -143,11 +187,26 @@ async function submitVerification() {
         walletAddress,
         signature,
         nonce,
-        timestamp,
+        timestamp: parseInt(timestamp),
       }),
     });
 
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Response error:', text);
+      try {
+        const data = JSON.parse(text);
+        showError(data.error || `Server error: ${response.status}`);
+      } catch {
+        showError(`Server error: ${response.status}`);
+      }
+      return;
+    }
+
     const data = await response.json();
+    console.log('Response data:', data);
 
     if (data.success) {
       // Success!
@@ -168,18 +227,19 @@ async function submitVerification() {
   } catch (error) {
     console.error('API error:', error);
     // Show manual fallback on network error
-    showManualFallback();
+    showManualFallback(`Could not connect to server: ${error.message}`);
   }
 }
 
 // Show manual fallback when API fails
-function showManualFallback() {
+function showManualFallback(reason) {
   verifiedWallet.textContent = formatAddress(walletAddress);
   rolesAssigned.innerHTML = `
-    <p>Could not connect to bot automatically.</p>
-    <p>Copy this signature and paste it in Discord:</p>
+    <p style="color: #ff6600;">${reason || 'Could not connect to bot automatically.'}</p>
+    <p>Copy this signature and paste it in Discord using the Manual Entry button:</p>
     <textarea id="signature-output" readonly style="width:100%;height:60px;margin:10px 0;background:#1a1a1a;color:#fff;border:1px solid #ff0033;padding:8px;font-size:11px;">${signature}</textarea>
     <button onclick="copySignature()" class="btn-secondary" style="margin-top:5px;">COPY SIGNATURE</button>
+    <p style="font-size:0.5rem;margin-top:10px;color:#888;">Wallet: ${walletAddress}</p>
   `;
   showStep(stepSuccess);
 }
@@ -189,6 +249,7 @@ function copySignature() {
   const textarea = document.getElementById('signature-output');
   if (textarea) {
     textarea.select();
+    textarea.setSelectionRange(0, 99999); // For mobile
     document.execCommand('copy');
     event.target.textContent = 'COPIED!';
     setTimeout(() => {
@@ -222,9 +283,9 @@ if (window.ethereum) {
   });
 }
 
-// Check if we have valid session params
-if (!sessionId && !nonce) {
-  showError('Invalid verification link. Please use the link from Discord.');
+// Check if we have valid session params - but don't block if missing
+if (!sessionId) {
+  console.warn('No session ID in URL - manual fallback will be used');
 }
 
 // ============================================
@@ -323,14 +384,16 @@ screenFlicker();
 
 // Add some random glitch to the title
 const glitchText = document.querySelector('.glitch-text');
-setInterval(() => {
-  if (Math.random() > 0.95) {
-    glitchText.style.transform = `translate(${(Math.random() - 0.5) * 5}px, ${(Math.random() - 0.5) * 5}px)`;
-    setTimeout(() => {
-      glitchText.style.transform = '';
-    }, 100);
-  }
-}, 100);
+if (glitchText) {
+  setInterval(() => {
+    if (Math.random() > 0.95) {
+      glitchText.style.transform = `translate(${(Math.random() - 0.5) * 5}px, ${(Math.random() - 0.5) * 5}px)`;
+      setTimeout(() => {
+        glitchText.style.transform = '';
+      }, 100);
+    }
+  }, 100);
+}
 
 console.log('%c🔥 THE GROTTO 🔥', 'color: #ff0033; font-size: 30px; font-weight: bold; text-shadow: 0 0 10px #ff0033;');
 console.log('%cWallet Verification System', 'color: #888; font-size: 14px;');
