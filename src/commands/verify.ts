@@ -74,16 +74,16 @@ export async function execute(
       },
       {
         name: '✍️ Step 2: Sign on Snowtrace',
-        value: '[Click here to open Snowtrace Signature Tool](https://snowtrace.io/verifiedSignatures#702be282)\n\n' +
-          '1. Connect your wallet\n' +
-          '2. Paste the message above\n' +
-          '3. Click "Sign Message"\n' +
-          '4. Copy the signature',
+        value: '**[Click here to open Snowtrace Signature Tool](https://snowtrace.io/verifiedSignatures#702be282)**\n\n' +
+          '• Click **"Connect to Web3"** and connect your wallet\n' +
+          '• Paste the message from Step 1 into the **"Message"** box\n' +
+          '• Click **"Sign Message"** and approve in your wallet\n' +
+          '• Copy the **entire signature** that appears (starts with 0x)',
         inline: false,
       },
       {
-        name: '✅ Step 3: Submit',
-        value: 'Click the button below and paste your wallet address + signature',
+        name: '✅ Step 3: Submit Below',
+        value: 'Click the button and paste:\n• Your wallet address (0x...)\n• The signature you copied from Snowtrace',
         inline: false,
       }
     );
