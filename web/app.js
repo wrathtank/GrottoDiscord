@@ -30,7 +30,7 @@ const ALLOWED_API_DOMAINS = [
   'localhost',
   '127.0.0.1',
   'enterthegrotto.xyz',
-  'thegrotto.xyz',
+  'ggrotto.xyz',
 ];
 
 function isValidApiUrl(url) {
