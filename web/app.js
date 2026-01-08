@@ -22,6 +22,34 @@ if (apiUrl) {
   }
 }
 
+// Security: Validate API URL against allowed domains
+const ALLOWED_API_DOMAINS = [
+  'herokuapp.com',
+  'heroku.com',
+  'vercel.app',
+  'localhost',
+  '127.0.0.1',
+  'enterthegrotto.xyz',
+  'thegrotto.xyz',
+];
+
+function isValidApiUrl(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_API_DOMAINS.some(domain =>
+      parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (apiUrl && !isValidApiUrl(apiUrl)) {
+  console.error('Invalid API URL detected, rejecting for security');
+  apiUrl = '';
+}
+
 // Debug logging
 console.log('Verification params:', { sessionId, nonce, timestamp, apiUrl });
 
@@ -213,10 +241,12 @@ async function submitVerification() {
       verifiedWallet.textContent = data.walletAddress || formatAddress(walletAddress);
 
       if (data.rolesAssigned && data.rolesAssigned.length > 0) {
+        // Sanitize role names to prevent XSS
+        const sanitize = (str) => str.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
         rolesAssigned.innerHTML = '<strong>Roles assigned:</strong><br>' +
-          data.rolesAssigned.map(r => `• ${r}`).join('<br>');
+          data.rolesAssigned.map(r => `• ${sanitize(r)}`).join('<br>');
       } else {
-        rolesAssigned.innerHTML = 'Wallet linked! Check Discord for role updates.';
+        rolesAssigned.textContent = 'Wallet linked! Check Discord for role updates.';
       }
 
       showStep(stepSuccess);
@@ -234,13 +264,39 @@ async function submitVerification() {
 // Show manual fallback when API fails
 function showManualFallback(reason) {
   verifiedWallet.textContent = formatAddress(walletAddress);
-  rolesAssigned.innerHTML = `
-    <p style="color: #ff6600;">${reason || 'Could not connect to bot automatically.'}</p>
-    <p>Copy this signature and paste it in Discord using the Manual Entry button:</p>
-    <textarea id="signature-output" readonly style="width:100%;height:60px;margin:10px 0;background:#1a1a1a;color:#fff;border:1px solid #ff0033;padding:8px;font-size:11px;">${signature}</textarea>
-    <button onclick="copySignature()" class="btn-secondary" style="margin-top:5px;">COPY SIGNATURE</button>
-    <p style="font-size:0.5rem;margin-top:10px;color:#888;">Wallet: ${walletAddress}</p>
-  `;
+
+  // Build fallback UI safely without innerHTML injection risks
+  rolesAssigned.innerHTML = '';
+
+  const reasonP = document.createElement('p');
+  reasonP.style.color = '#ff6600';
+  reasonP.textContent = reason || 'Could not connect to bot automatically.';
+
+  const instructionP = document.createElement('p');
+  instructionP.textContent = 'Copy this signature and paste it in Discord using the Manual Entry button:';
+
+  const textarea = document.createElement('textarea');
+  textarea.id = 'signature-output';
+  textarea.readOnly = true;
+  textarea.style.cssText = 'width:100%;height:60px;margin:10px 0;background:#1a1a1a;color:#fff;border:1px solid #ff0033;padding:8px;font-size:11px;';
+  textarea.value = signature;
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn-secondary';
+  copyBtn.style.marginTop = '5px';
+  copyBtn.textContent = 'COPY SIGNATURE';
+  copyBtn.onclick = copySignature;
+
+  const walletP = document.createElement('p');
+  walletP.style.cssText = 'font-size:0.5rem;margin-top:10px;color:#888;';
+  walletP.textContent = `Wallet: ${walletAddress}`;
+
+  rolesAssigned.appendChild(reasonP);
+  rolesAssigned.appendChild(instructionP);
+  rolesAssigned.appendChild(textarea);
+  rolesAssigned.appendChild(copyBtn);
+  rolesAssigned.appendChild(walletP);
+
   showStep(stepSuccess);
 }
 
