@@ -241,12 +241,10 @@ export class BlockchainService {
   }
 
   async verifyRole(role: RoleConfig, walletAddress: string): Promise<VerificationResult> {
-    const results: RequirementResult[] = [];
-
-    for (const requirement of role.requirements) {
-      const result = await this.checkRequirement(requirement, walletAddress);
-      results.push(result);
-    }
+    // Run all requirement checks in parallel
+    const results = await Promise.all(
+      role.requirements.map(req => this.checkRequirement(req, walletAddress))
+    );
 
     let qualified: boolean;
     if (role.requireAll) {
@@ -267,12 +265,11 @@ export class BlockchainService {
     roles: RoleConfig[],
     walletAddress: string
   ): Promise<VerificationResult[]> {
-    const results: VerificationResult[] = [];
-
-    for (const role of roles) {
-      const result = await this.verifyRole(role, walletAddress);
-      results.push(result);
-    }
+    // Run all role checks in parallel for speed and to avoid
+    // sequential timeout issues with cold RPC connections
+    const results = await Promise.all(
+      roles.map(role => this.verifyRole(role, walletAddress))
+    );
 
     return results;
   }
