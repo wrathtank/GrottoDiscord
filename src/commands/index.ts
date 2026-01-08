@@ -4,6 +4,7 @@ import * as unlink from './unlink';
 import * as status from './status';
 import * as admin from './admin';
 import * as ggrotto from './ggrotto';
+import * as welcome from './welcome';
 
 export const commands = {
   verify,
@@ -12,6 +13,7 @@ export const commands = {
   status,
   admin,
   ggrotto,
+  welcome,
 };
 
 export const commandData = [
@@ -21,4 +23,5 @@ export const commandData = [
   status.data,
   admin.data,
   ggrotto.data,
+  welcome.data,
 ];
