@@ -315,27 +315,75 @@ These are ready to paste into the Heroku Config Vars. Just replace the placehold
 
 **Note:** The "whale" role uses `requireAll: true` meaning user needs BOTH 100k tokens AND 5 NFTs.
 
-## Data Persistence
+## Data Persistence with Supabase
 
-⚠️ **Important**: Heroku's filesystem is ephemeral. The SQLite database will be lost when:
-- Dyno restarts (happens daily)
-- You deploy new code
-- Dyno sleeps and wakes up (free tier)
+⚠️ **Important**: Heroku's filesystem is ephemeral. Without Supabase, wallet links will be lost when the dyno restarts.
 
-### Solutions:
+### Setting Up Supabase (Recommended)
 
-1. **Heroku Postgres (Recommended for production)**
-   - Coming soon: Full PostgreSQL support
-   - For now, users will need to re-verify after restarts
+1. **Create a Supabase Account**
+   - Go to [supabase.com](https://supabase.com) and sign up
+   - Create a new project
 
-2. **Accept Ephemeral Storage**
-   - Suitable for small communities
-   - Users re-verify occasionally
-   - No additional cost
+2. **Create Database Tables**
+   - Go to the SQL Editor in your Supabase dashboard
+   - Run this SQL to create the required tables:
 
-3. **External Database**
-   - Set `DATABASE_PATH` to a persistent volume
-   - Requires additional addon
+```sql
+-- Linked wallets table
+CREATE TABLE linked_wallets (
+  id SERIAL PRIMARY KEY,
+  discord_id TEXT UNIQUE NOT NULL,
+  wallet_address TEXT NOT NULL,
+  linked_at TIMESTAMPTZ DEFAULT NOW(),
+  last_verified TIMESTAMPTZ DEFAULT NOW(),
+  signature TEXT,
+  nonce TEXT
+);
+
+-- Verification sessions table
+CREATE TABLE verification_sessions (
+  id TEXT PRIMARY KEY,
+  discord_id TEXT NOT NULL,
+  nonce TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  wallet_address TEXT
+);
+
+-- Role assignments table
+CREATE TABLE role_assignments (
+  id SERIAL PRIMARY KEY,
+  discord_id TEXT NOT NULL,
+  role_id TEXT NOT NULL,
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  last_checked TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(discord_id, role_id)
+);
+
+-- Create indexes
+CREATE INDEX idx_wallets_discord ON linked_wallets(discord_id);
+CREATE INDEX idx_wallets_address ON linked_wallets(wallet_address);
+CREATE INDEX idx_sessions_discord ON verification_sessions(discord_id);
+CREATE INDEX idx_roles_discord ON role_assignments(discord_id);
+```
+
+3. **Get Your Credentials**
+   - Go to Project Settings → API
+   - Copy the **Project URL** → This is `SUPABASE_URL`
+   - Copy the **anon public** key → This is `SUPABASE_KEY`
+
+4. **Add to Heroku Config Vars**
+   - In Heroku Settings → Config Vars, add:
+     - `SUPABASE_URL` = your project URL
+     - `SUPABASE_KEY` = your anon key
+
+### Without Supabase
+
+If you don't set up Supabase, the bot will use local SQLite storage. This means:
+- Wallet links will be lost when dyno restarts (daily on Heroku)
+- Users will need to re-verify occasionally
+- Suitable for small communities or testing
 
 ## Useful Commands
 

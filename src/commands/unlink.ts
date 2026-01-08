@@ -14,7 +14,7 @@ import {
   unlinkWallet,
   getRoleAssignments,
   removeRoleAssignment,
-} from '../database';
+} from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('unlink')
@@ -25,7 +25,7 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const wallet = getLinkedWallet(interaction.user.id);
+  const wallet = await getLinkedWallet(interaction.user.id);
 
   if (!wallet) {
     const embed = new EmbedBuilder()
@@ -86,7 +86,7 @@ export async function handleButton(
   }
 
   if (action === 'confirm') {
-    const wallet = getLinkedWallet(interaction.user.id);
+    const wallet = await getLinkedWallet(interaction.user.id);
     if (!wallet) {
       await interaction.update({
         content: '❌ No wallet found to unlink.',
@@ -100,7 +100,7 @@ export async function handleButton(
     if (guild) {
       try {
         const member = await guild.members.fetch(interaction.user.id);
-        const roleAssignments = getRoleAssignments(interaction.user.id);
+        const roleAssignments = await getRoleAssignments(interaction.user.id);
 
         for (const roleId of roleAssignments) {
           const roleConfig = config.roles.find((r) => r.id === roleId);
@@ -109,7 +109,7 @@ export async function handleButton(
             if (discordRole && member.roles.cache.has(discordRole.id)) {
               await member.roles.remove(discordRole);
             }
-            removeRoleAssignment(interaction.user.id, roleId);
+            await removeRoleAssignment(interaction.user.id, roleId);
           }
         }
       } catch (error) {
@@ -117,7 +117,7 @@ export async function handleButton(
       }
     }
 
-    unlinkWallet(interaction.user.id);
+    await unlinkWallet(interaction.user.id);
 
     const embed = new EmbedBuilder()
       .setTitle('✅ Wallet Unlinked')

@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { BlockchainService } from '../services/blockchain';
 import { BotConfig } from '../types';
-import { getLinkedWallet, getRoleAssignments } from '../database';
+import { getLinkedWallet, getRoleAssignments } from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('status')
@@ -16,7 +16,7 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const wallet = getLinkedWallet(interaction.user.id);
+  const wallet = await getLinkedWallet(interaction.user.id);
 
   if (!wallet) {
     const embed = new EmbedBuilder()
@@ -31,7 +31,7 @@ export async function execute(
   await interaction.deferReply({ ephemeral: true });
 
   const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
-  const currentRoles = getRoleAssignments(interaction.user.id);
+  const currentRoles = await getRoleAssignments(interaction.user.id);
 
   const embed = new EmbedBuilder()
     .setTitle('📊 Wallet Status')

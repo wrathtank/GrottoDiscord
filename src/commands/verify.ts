@@ -24,7 +24,7 @@ import {
   recordRoleAssignment,
   removeRoleAssignment,
   getWalletByAddress,
-} from '../database';
+} from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -35,7 +35,7 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const existingWallet = getLinkedWallet(interaction.user.id);
+  const existingWallet = await getLinkedWallet(interaction.user.id);
 
   if (existingWallet) {
     const embed = new EmbedBuilder()
@@ -53,7 +53,7 @@ export async function execute(
   const nonce = uuidv4().replace(/-/g, '').slice(0, 16);
   const expiryMinutes = parseInt(process.env.VERIFICATION_EXPIRY_MINUTES || '10');
 
-  createVerificationSession(sessionId, interaction.user.id, nonce, expiryMinutes);
+  await createVerificationSession(sessionId, interaction.user.id, nonce, expiryMinutes);
 
   const timestamp = Date.now();
   const message = blockchain.generateSignatureMessage(nonce, timestamp);
@@ -100,7 +100,7 @@ export async function handleButton(
   const [, action, sessionId] = interaction.customId.split('_');
 
   if (action === 'start') {
-    const session = getVerificationSession(sessionId);
+    const session = await getVerificationSession(sessionId);
 
     if (!session) {
       await interaction.reply({
@@ -119,7 +119,7 @@ export async function handleButton(
     }
 
     if (Date.now() > session.expiresAt) {
-      deleteVerificationSession(sessionId);
+      await deleteVerificationSession(sessionId);
       await interaction.reply({
         content: '❌ Session expired. Please use `/verify` again.',
         ephemeral: true,
@@ -163,7 +163,7 @@ export async function handleModal(
 ) {
   const [, , sessionId] = interaction.customId.split('_');
 
-  const session = getVerificationSession(sessionId);
+  const session = await getVerificationSession(sessionId);
 
   if (!session || session.discordId !== interaction.user.id) {
     await interaction.reply({
@@ -184,7 +184,7 @@ export async function handleModal(
     return;
   }
 
-  const existingLink = getWalletByAddress(walletAddress);
+  const existingLink = await getWalletByAddress(walletAddress);
   if (existingLink && existingLink.discordId !== interaction.user.id) {
     await interaction.reply({
       content: '❌ This wallet is already linked to another Discord account.',
@@ -208,8 +208,8 @@ export async function handleModal(
 
   await interaction.deferReply({ ephemeral: true });
 
-  linkWallet(interaction.user.id, walletAddress, signature, session.nonce);
-  deleteVerificationSession(sessionId);
+  await linkWallet(interaction.user.id, walletAddress, signature, session.nonce);
+  await deleteVerificationSession(sessionId);
 
   const results = await blockchain.verifyAllRoles(config.roles, walletAddress);
   const qualifiedRoles = results.filter((r) => r.qualified);
@@ -232,7 +232,7 @@ export async function handleModal(
       const discordRole = guild.roles.cache.get(roleConfig.discordRoleId);
       if (discordRole && !member.roles.cache.has(discordRole.id)) {
         await member.roles.add(discordRole);
-        recordRoleAssignment(interaction.user.id, roleConfig.id);
+        await recordRoleAssignment(interaction.user.id, roleConfig.id);
         assignedRoles.push(roleConfig.name);
 
         if (roleConfig.assignEmbed) {

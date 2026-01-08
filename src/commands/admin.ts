@@ -13,7 +13,7 @@ import {
   getRoleAssignments,
   removeRoleAssignment,
   cleanExpiredSessions,
-} from '../database';
+} from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -104,7 +104,7 @@ async function handleStats(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const allWallets = getAllLinkedWallets();
+  const allWallets = await getAllLinkedWallets();
   const chainNames = blockchain.getChainNames();
 
   const embed = new EmbedBuilder()
@@ -178,7 +178,7 @@ async function handleLookup(
   config: BotConfig
 ) {
   const user = interaction.options.getUser('user', true);
-  const wallet = getLinkedWallet(user.id);
+  const wallet = await getLinkedWallet(user.id);
 
   if (!wallet) {
     await interaction.reply({
@@ -191,7 +191,7 @@ async function handleLookup(
   await interaction.deferReply({ ephemeral: true });
 
   const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
-  const roleAssignments = getRoleAssignments(user.id);
+  const roleAssignments = await getRoleAssignments(user.id);
 
   const embed = new EmbedBuilder()
     .setTitle(`🔍 Wallet Lookup: ${user.tag}`)
@@ -234,7 +234,7 @@ async function handleForceUnlink(
   config: BotConfig
 ) {
   const user = interaction.options.getUser('user', true);
-  const wallet = getLinkedWallet(user.id);
+  const wallet = await getLinkedWallet(user.id);
 
   if (!wallet) {
     await interaction.reply({
@@ -248,7 +248,7 @@ async function handleForceUnlink(
   if (guild) {
     try {
       const member = await guild.members.fetch(user.id);
-      const roleAssignments = getRoleAssignments(user.id);
+      const roleAssignments = await getRoleAssignments(user.id);
 
       for (const roleId of roleAssignments) {
         const roleConfig = config.roles.find((r) => r.id === roleId);
@@ -257,7 +257,7 @@ async function handleForceUnlink(
           if (discordRole && member.roles.cache.has(discordRole.id)) {
             await member.roles.remove(discordRole);
           }
-          removeRoleAssignment(user.id, roleId);
+          await removeRoleAssignment(user.id, roleId);
         }
       }
     } catch (error) {
@@ -265,7 +265,7 @@ async function handleForceUnlink(
     }
   }
 
-  unlinkWallet(user.id);
+  await unlinkWallet(user.id);
 
   await interaction.reply({
     content: `✅ Successfully unlinked wallet for ${user.tag} and removed all verification roles.`,
@@ -278,7 +278,7 @@ async function handleRefreshAll(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const allWallets = getAllLinkedWallets();
+  const allWallets = await getAllLinkedWallets();
 
   if (allWallets.length === 0) {
     await interaction.reply({
@@ -342,7 +342,7 @@ async function handleRefreshAll(
 }
 
 async function handleCleanup(interaction: ChatInputCommandInteraction) {
-  const cleaned = cleanExpiredSessions();
+  const cleaned = await cleanExpiredSessions();
 
   await interaction.reply({
     content: `✅ Cleaned up ${cleaned} expired verification session(s).`,

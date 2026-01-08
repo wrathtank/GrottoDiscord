@@ -11,7 +11,7 @@ import {
   recordRoleAssignment,
   removeRoleAssignment,
   getRoleAssignments,
-} from '../database';
+} from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('refresh')
@@ -22,7 +22,7 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const wallet = getLinkedWallet(interaction.user.id);
+  const wallet = await getLinkedWallet(interaction.user.id);
 
   if (!wallet) {
     const embed = new EmbedBuilder()
@@ -45,7 +45,7 @@ export async function execute(
   }
 
   const member = await guild.members.fetch(interaction.user.id);
-  const previousRoles = getRoleAssignments(interaction.user.id);
+  const previousRoles = await getRoleAssignments(interaction.user.id);
   const addedRoles: string[] = [];
   const removedRoles: string[] = [];
   const keptRoles: string[] = [];
@@ -65,7 +65,7 @@ export async function execute(
       if (!hasRole) {
         try {
           await member.roles.add(discordRole);
-          recordRoleAssignment(interaction.user.id, roleConfig.id);
+          await recordRoleAssignment(interaction.user.id, roleConfig.id);
           addedRoles.push(roleConfig.name);
 
           if (roleConfig.assignEmbed) {
@@ -101,7 +101,7 @@ export async function execute(
       if (hasRole && config.verification.autoRevokeOnFailure) {
         try {
           await member.roles.remove(discordRole);
-          removeRoleAssignment(interaction.user.id, roleConfig.id);
+          await removeRoleAssignment(interaction.user.id, roleConfig.id);
           removedRoles.push(roleConfig.name);
         } catch (error) {
           console.error(`[Refresh] Failed to remove role ${roleConfig.name}:`, error);
@@ -110,7 +110,7 @@ export async function execute(
     }
   }
 
-  updateLastVerified(interaction.user.id);
+  await updateLastVerified(interaction.user.id);
 
   const summaryEmbed = new EmbedBuilder()
     .setTitle('🔄 Roles Refreshed')

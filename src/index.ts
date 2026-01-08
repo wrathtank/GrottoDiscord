@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { GrottoBot } from './bot';
-import { initDatabase, cleanExpiredSessions } from './database';
+import { initDatabase, cleanExpiredSessions, getAllLinkedWallets } from './database/unified';
 import { BotConfig } from './types';
 
 function loadConfig(): BotConfig {
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
 
   await initDatabase();
 
-  const cleaned = cleanExpiredSessions();
+  const cleaned = await cleanExpiredSessions();
   if (cleaned > 0) {
     console.log(`[Database] Cleaned ${cleaned} expired session(s)`);
   }
@@ -97,6 +97,7 @@ async function main(): Promise<void> {
 
   const cleanup = async () => {
     console.log('\n[Main] Received shutdown signal...');
+    if (refreshInterval) clearInterval(refreshInterval);
     await bot.stop();
     process.exit(0);
   };
@@ -107,9 +108,83 @@ async function main(): Promise<void> {
   try {
     await bot.start();
     console.log('[Main] Bot is now running!');
+
+    // Start scheduled role refresh (every hour by default, or from config)
+    const refreshHours = config.verification.refreshIntervalHours || 24;
+    const refreshMs = refreshHours * 60 * 60 * 1000;
+
+    console.log(`[Scheduler] Role refresh scheduled every ${refreshHours} hour(s)`);
+
+    refreshInterval = setInterval(async () => {
+      console.log('[Scheduler] Starting scheduled role refresh...');
+      await refreshAllWallets(bot, config);
+    }, refreshMs);
+
   } catch (error) {
     console.error('[Main] Failed to start bot:', error);
     process.exit(1);
+  }
+}
+
+let refreshInterval: NodeJS.Timeout | null = null;
+
+async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<void> {
+  try {
+    const allWallets = await getAllLinkedWallets();
+    const client = bot.getClient();
+    const blockchain = bot.getBlockchain();
+
+    if (allWallets.length === 0) {
+      console.log('[Scheduler] No wallets to refresh');
+      return;
+    }
+
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) {
+      console.log('[Scheduler] No DISCORD_GUILD_ID set, skipping refresh');
+      return;
+    }
+
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      console.log('[Scheduler] Could not find guild');
+      return;
+    }
+
+    let processed = 0;
+    let errors = 0;
+
+    for (const wallet of allWallets) {
+      try {
+        const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+        const member = await guild.members.fetch(wallet.discordId).catch(() => null);
+
+        if (member) {
+          for (const result of results) {
+            const roleConfig = config.roles.find((r) => r.id === result.roleId);
+            if (!roleConfig) continue;
+
+            const discordRole = guild.roles.cache.get(roleConfig.discordRoleId);
+            if (!discordRole) continue;
+
+            const hasRole = member.roles.cache.has(discordRole.id);
+
+            if (result.qualified && !hasRole) {
+              await member.roles.add(discordRole);
+            } else if (!result.qualified && hasRole && config.verification.autoRevokeOnFailure) {
+              await member.roles.remove(discordRole);
+            }
+          }
+        }
+        processed++;
+      } catch (error) {
+        errors++;
+      }
+    }
+
+    console.log(`[Scheduler] Refresh complete: ${processed} processed, ${errors} errors`);
+  } catch (error) {
+    console.error('[Scheduler] Error during scheduled refresh:', error);
   }
 }
 
