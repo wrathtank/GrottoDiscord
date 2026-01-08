@@ -1,0 +1,103 @@
+{
+  "verification": {
+    "enabled": true,
+    "requireSignature": true,
+    "refreshIntervalHours": 24,
+    "autoRevokeOnFailure": true
+  },
+  "chains": {
+    "avax": {
+      "name": "Avalanche C-Chain",
+      "chainId": 43114,
+      "rpcPrimary": "https://api.avax.network/ext/bc/C/rpc",
+      "rpcSecondary": "https://avalanche-c-chain.publicnode.com"
+    },
+    "grotto": {
+      "name": "The Grotto L1",
+      "chainId": 36463,
+      "rpcPrimary": "https://subnets.avax.network/thegrotto/mainnet/rpc",
+      "rpcSecondary": "https://subnets.avax.network/thegrotto/mainnet/rpc"
+    }
+  },
+  "roles": [
+    {
+      "id": "heresy_holder",
+      "name": "HERESY Holder",
+      "discordRoleId": "YOUR_HERESY_ROLE_ID",
+      "description": "Holders of HERESY token on Avalanche",
+      "color": "#E84142",
+      "requirements": [
+        {
+          "type": "erc20",
+          "chainId": "avax",
+          "contractAddress": "0x432d38f83a50ec77c409d086e97448794cf76dcf",
+          "minBalance": "1000000000000000000",
+          "symbol": "HERESY",
+          "decimals": 18
+        }
+      ],
+      "assignEmbed": {
+        "title": "🔥 HERESY Holder Verified!",
+        "description": "Your HERESY holdings have been verified!",
+        "color": "#E84142"
+      }
+    },
+    {
+      "id": "ad_holder",
+      "name": "Analog Distortions Holder",
+      "discordRoleId": "YOUR_AD_HOLDER_ROLE_ID",
+      "description": "Holders of Analog Distortions NFTs",
+      "color": "#9945FF",
+      "requirements": [
+        {
+          "type": "erc721",
+          "chainId": "avax",
+          "contractAddress": "0x0a337be2ea71e3aea9c82d45b036ac6a6123b6d0",
+          "minBalance": "1",
+          "name": "Analog Distortions"
+        }
+      ],
+      "assignEmbed": {
+        "title": "🖼️ Analog Distortions Holder!",
+        "description": "Your Analog Distortions NFT ownership has been verified!",
+        "color": "#9945FF"
+      }
+    },
+    {
+      "id": "ad_staker",
+      "name": "Analog Distortions Staker",
+      "discordRoleId": "YOUR_AD_STAKER_ROLE_ID",
+      "description": "Users staking Analog Distortions NFTs",
+      "color": "#FFD700",
+      "requirements": [
+        {
+          "type": "staked",
+          "chainId": "avax",
+          "contractAddress": "0x51697170f78136c8d143b0013cf5b229ade70757",
+          "method": "stakers",
+          "minBalance": "1",
+          "symbol": "Staked AD",
+          "decimals": 0
+        }
+      ],
+      "assignEmbed": {
+        "title": "🔒 AD Staker Verified!",
+        "description": "Your staked Analog Distortions have been verified!",
+        "color": "#FFD700"
+      }
+    }
+  ],
+  "customAbis": {
+    "staking": [
+      "function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)"
+    ]
+  },
+  "messages": {
+    "verificationStart": "Click the button below to start the verification process.",
+    "walletConnected": "Wallet connected! Checking your holdings...",
+    "verificationSuccess": "Verification complete! Your roles have been updated.",
+    "verificationFailed": "Verification failed. You don't meet the requirements for any roles.",
+    "alreadyVerified": "You already have a wallet linked. Use /unlink to remove it first.",
+    "notLinked": "You don't have a wallet linked. Use /verify to link one."
+  }
+}
