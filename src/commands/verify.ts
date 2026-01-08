@@ -73,33 +73,43 @@ export async function execute(
 
     embed.addFields(
       {
-        name: '🔥 Click to Verify',
-        value: `**[Open Verification Page](${verifyLink})**`,
-        inline: false,
-      },
-      {
         name: '📋 Instructions',
-        value: '1. Connect your wallet\n2. Sign the message\n3. Done! Roles assigned automatically',
+        value: '1. Click the button below\n2. Connect your wallet\n3. Sign the message\n4. Done! Roles assigned automatically',
         inline: false,
       }
     );
+
+    // Use a URL button for the verification link (clickable!)
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setLabel('🔥 Verify Wallet')
+        .setStyle(ButtonStyle.Link)
+        .setURL(verifyLink),
+      new ButtonBuilder()
+        .setCustomId(`verify_start_${sessionId}`)
+        .setLabel('Manual Entry')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🔗')
+    );
+
+    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
   } else {
     embed.addFields({
       name: '✅ Enter Your Wallet',
       value: 'Click the button below and enter your wallet address (0x...)',
       inline: false,
     });
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`verify_start_${sessionId}`)
+        .setLabel('Enter Wallet Address')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('🔗')
+    );
+
+    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
   }
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`verify_start_${sessionId}`)
-      .setLabel(config.verification.requireSignature ? 'Manual Entry (Backup)' : 'Enter Wallet Address')
-      .setStyle(config.verification.requireSignature ? ButtonStyle.Secondary : ButtonStyle.Primary)
-      .setEmoji('🔗')
-  );
-
-  await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
 }
 
 export async function handleButton(
