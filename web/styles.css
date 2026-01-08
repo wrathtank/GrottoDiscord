@@ -449,27 +449,21 @@ body {
   color: var(--red);
 }
 
-/* Loading skull animation */
-.loading-skull {
-  margin: 30px 0;
+/* Loading spinner */
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  margin: 30px auto;
+  border: 4px solid var(--gray);
+  border-top: 4px solid var(--red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 0 20px var(--red);
 }
 
-.pulse-skull {
-  width: 80px;
-  height: 80px;
-  animation: pulse-loading 1s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px var(--red));
-}
-
-@keyframes pulse-loading {
-  0%, 100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 20px var(--red));
-  }
-  50% {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 40px var(--red)) drop-shadow(0 0 60px orange);
-  }
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Wallet info bar */
