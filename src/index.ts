@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { GrottoBot } from './bot';
 import { initDatabase, cleanExpiredSessions, getAllLinkedWallets } from './database/unified';
+import { initApiServer, startApiServer } from './api/server';
 import { BotConfig } from './types';
 
 function loadConfig(): BotConfig {
@@ -108,6 +109,10 @@ async function main(): Promise<void> {
   try {
     await bot.start();
     console.log('[Main] Bot is now running!');
+
+    // Start API server for web verification
+    const apiApp = initApiServer(bot.getClient(), bot.getBlockchain(), config);
+    startApiServer(apiApp);
 
     // Start scheduled role refresh (every hour by default, or from config)
     const refreshHours = config.verification.refreshIntervalHours || 24;

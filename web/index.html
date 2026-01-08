@@ -52,18 +52,22 @@
         </button>
       </div>
 
+      <div id="step-verifying" class="step">
+        <h2>VERIFYING...</h2>
+        <p>Connecting to Discord bot...</p>
+        <div class="loading-skull">
+          <img src="images/grotto-skull.png" alt="" class="pulse-skull">
+        </div>
+      </div>
+
       <div id="step-success" class="step">
         <h2 class="success-text">VERIFICATION COMPLETE</h2>
         <p>Your wallet has been verified!</p>
         <div class="wallet-display">
           <span id="verified-wallet"></span>
         </div>
-        <p class="return-text">Return to Discord and click "Submit" to complete verification</p>
-        <div class="signature-box">
-          <p>Your signature (copy this):</p>
-          <textarea id="signature-output" readonly></textarea>
-          <button id="btn-copy" class="btn-secondary">COPY SIGNATURE</button>
-        </div>
+        <div id="roles-assigned" class="roles-display"></div>
+        <p class="return-text">You can close this page and return to Discord!</p>
       </div>
 
       <div id="step-error" class="step">

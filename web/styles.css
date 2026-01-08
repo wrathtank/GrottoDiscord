@@ -433,6 +433,45 @@ body {
   color: #00ff00;
 }
 
+/* Roles display */
+.roles-display {
+  background: var(--darker);
+  border: 1px solid var(--dark-red);
+  border-radius: 5px;
+  padding: 15px;
+  margin: 15px 0;
+  font-size: 0.65rem;
+  line-height: 1.8;
+  color: #ccc;
+}
+
+.roles-display strong {
+  color: var(--red);
+}
+
+/* Loading skull animation */
+.loading-skull {
+  margin: 30px 0;
+}
+
+.pulse-skull {
+  width: 80px;
+  height: 80px;
+  animation: pulse-loading 1s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px var(--red));
+}
+
+@keyframes pulse-loading {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 20px var(--red));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 40px var(--red)) drop-shadow(0 0 60px orange);
+  }
+}
+
 /* Wallet info bar */
 .wallet-info {
   position: fixed;

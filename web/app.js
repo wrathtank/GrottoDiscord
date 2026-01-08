@@ -1,5 +1,5 @@
 // The Grotto - Wallet Verification
-// Fire cursor and particle effects
+// Automatic verification flow
 
 let provider = null;
 let signer = null;
@@ -8,15 +8,16 @@ let signature = null;
 
 // Get verification params from URL
 const urlParams = new URLSearchParams(window.location.search);
+const sessionId = urlParams.get('session');
 const nonce = urlParams.get('nonce') || generateNonce();
 const timestamp = urlParams.get('timestamp') || Date.now();
-const returnUrl = urlParams.get('return');
+const apiUrl = urlParams.get('api') || '';
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 18);
 }
 
-// Generate the message to sign
+// Generate the message to sign (must match the bot's format)
 function generateMessage() {
   return `Sign this message to verify your wallet ownership for The Grotto Discord.
 
@@ -27,25 +28,27 @@ Timestamp: ${timestamp}`;
 // DOM Elements
 const stepConnect = document.getElementById('step-connect');
 const stepSign = document.getElementById('step-sign');
+const stepVerifying = document.getElementById('step-verifying');
 const stepSuccess = document.getElementById('step-success');
 const stepError = document.getElementById('step-error');
 
 const btnConnect = document.getElementById('btn-connect');
 const btnSign = document.getElementById('btn-sign');
 const btnRetry = document.getElementById('btn-retry');
-const btnCopy = document.getElementById('btn-copy');
 
 const signMessage = document.getElementById('sign-message');
 const verifiedWallet = document.getElementById('verified-wallet');
-const signatureOutput = document.getElementById('signature-output');
+const rolesAssigned = document.getElementById('roles-assigned');
 const errorMessage = document.getElementById('error-message');
 const walletInfo = document.getElementById('wallet-info');
 const walletAddressDisplay = document.getElementById('wallet-address');
 
 // Show step
 function showStep(step) {
-  [stepConnect, stepSign, stepSuccess, stepError].forEach(s => s.classList.remove('active'));
-  step.classList.add('active');
+  [stepConnect, stepSign, stepVerifying, stepSuccess, stepError].forEach(s => {
+    if (s) s.classList.remove('active');
+  });
+  if (step) step.classList.add('active');
 }
 
 // Show error
@@ -96,7 +99,7 @@ async function connectWallet() {
   }
 }
 
-// Sign message
+// Sign message and verify
 async function signMessageWithWallet() {
   try {
     btnSign.innerHTML = '<span>SIGNING...</span>';
@@ -104,13 +107,11 @@ async function signMessageWithWallet() {
     const message = generateMessage();
     signature = await signer.signMessage(message);
 
-    // Success!
-    verifiedWallet.textContent = walletAddress;
-    signatureOutput.value = signature;
-    showStep(stepSuccess);
+    // Show verifying step
+    showStep(stepVerifying);
 
-    // If return URL is provided, could auto-redirect
-    // For now, user copies signature back to Discord
+    // Send to API for automatic verification
+    await submitVerification();
 
   } catch (error) {
     console.error('Signing error:', error);
@@ -123,14 +124,77 @@ async function signMessageWithWallet() {
   }
 }
 
-// Copy signature
+// Submit verification to bot API
+async function submitVerification() {
+  try {
+    if (!apiUrl || !sessionId) {
+      // No API configured, show manual fallback
+      showManualFallback();
+      return;
+    }
+
+    const response = await fetch(`${apiUrl}/api/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionId,
+        walletAddress,
+        signature,
+        nonce,
+        timestamp,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      // Success!
+      verifiedWallet.textContent = data.walletAddress || formatAddress(walletAddress);
+
+      if (data.rolesAssigned && data.rolesAssigned.length > 0) {
+        rolesAssigned.innerHTML = '<strong>Roles assigned:</strong><br>' +
+          data.rolesAssigned.map(r => `• ${r}`).join('<br>');
+      } else {
+        rolesAssigned.innerHTML = 'Wallet linked! Check Discord for role updates.';
+      }
+
+      showStep(stepSuccess);
+    } else {
+      showError(data.error || 'Verification failed. Please try again.');
+    }
+
+  } catch (error) {
+    console.error('API error:', error);
+    // Show manual fallback on network error
+    showManualFallback();
+  }
+}
+
+// Show manual fallback when API fails
+function showManualFallback() {
+  verifiedWallet.textContent = formatAddress(walletAddress);
+  rolesAssigned.innerHTML = `
+    <p>Could not connect to bot automatically.</p>
+    <p>Copy this signature and paste it in Discord:</p>
+    <textarea id="signature-output" readonly style="width:100%;height:60px;margin:10px 0;background:#1a1a1a;color:#fff;border:1px solid #ff0033;padding:8px;font-size:11px;">${signature}</textarea>
+    <button onclick="copySignature()" class="btn-secondary" style="margin-top:5px;">COPY SIGNATURE</button>
+  `;
+  showStep(stepSuccess);
+}
+
+// Copy signature fallback
 function copySignature() {
-  signatureOutput.select();
-  document.execCommand('copy');
-  btnCopy.textContent = 'COPIED!';
-  setTimeout(() => {
-    btnCopy.textContent = 'COPY SIGNATURE';
-  }, 2000);
+  const textarea = document.getElementById('signature-output');
+  if (textarea) {
+    textarea.select();
+    document.execCommand('copy');
+    event.target.textContent = 'COPIED!';
+    setTimeout(() => {
+      event.target.textContent = 'COPY SIGNATURE';
+    }, 2000);
+  }
 }
 
 // Retry
@@ -144,7 +208,6 @@ function retry() {
 btnConnect.addEventListener('click', connectWallet);
 btnSign.addEventListener('click', signMessageWithWallet);
 btnRetry.addEventListener('click', retry);
-btnCopy.addEventListener('click', copySignature);
 
 // Listen for account changes
 if (window.ethereum) {
@@ -157,6 +220,11 @@ if (window.ethereum) {
       walletAddressDisplay.textContent = formatAddress(walletAddress);
     }
   });
+}
+
+// Check if we have valid session params
+if (!sessionId && !nonce) {
+  showError('Invalid verification link. Please use the link from Discord.');
 }
 
 // ============================================
