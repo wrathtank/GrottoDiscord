@@ -58,33 +58,47 @@ export async function execute(
   const timestamp = Date.now();
   const message = blockchain.generateSignatureMessage(nonce, timestamp);
 
+  // Build embed based on whether signature is required
   const embed = new EmbedBuilder()
     .setTitle('🔐 Wallet Verification')
     .setDescription(config.messages.verificationStart)
-    .addFields(
-      {
-        name: 'Step 1',
-        value: 'Click the button below to enter your wallet address',
-        inline: false,
-      },
-      {
-        name: 'Step 2',
-        value: 'Sign the verification message with your wallet',
-        inline: false,
-      },
-      {
-        name: 'Message to Sign',
-        value: `\`\`\`\n${message}\n\`\`\``,
-        inline: false,
-      }
-    )
     .setColor(0x5865f2)
     .setFooter({ text: `Session expires in ${expiryMinutes} minutes • ID: ${sessionId.slice(0, 8)}` });
+
+  if (config.verification.requireSignature) {
+    embed.addFields(
+      {
+        name: '📋 Step 1: Copy This Message',
+        value: `\`\`\`\n${message}\n\`\`\``,
+        inline: false,
+      },
+      {
+        name: '✍️ Step 2: Sign on Snowtrace',
+        value: '[Click here to open Snowtrace Signature Tool](https://snowtrace.io/verifiedSignatures#702be282)\n\n' +
+          '1. Connect your wallet\n' +
+          '2. Paste the message above\n' +
+          '3. Click "Sign Message"\n' +
+          '4. Copy the signature',
+        inline: false,
+      },
+      {
+        name: '✅ Step 3: Submit',
+        value: 'Click the button below and paste your wallet address + signature',
+        inline: false,
+      }
+    );
+  } else {
+    embed.addFields({
+      name: '✅ Enter Your Wallet',
+      value: 'Click the button below and enter your wallet address (0x...)',
+      inline: false,
+    });
+  }
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`verify_start_${sessionId}`)
-      .setLabel('Enter Wallet Details')
+      .setLabel(config.verification.requireSignature ? 'Enter Wallet & Signature' : 'Enter Wallet Address')
       .setStyle(ButtonStyle.Primary)
       .setEmoji('🔗')
   );
@@ -133,24 +147,28 @@ export async function handleButton(
 
     const walletInput = new TextInputBuilder()
       .setCustomId('wallet_address')
-      .setLabel('Wallet Address')
-      .setPlaceholder('0x...')
+      .setLabel('Your Wallet Address')
+      .setPlaceholder('0x1234...abcd')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(42)
       .setMaxLength(42);
 
-    const signatureInput = new TextInputBuilder()
-      .setCustomId('signature')
-      .setLabel('Signature (from signing the message)')
-      .setPlaceholder('0x...')
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(config.verification.requireSignature);
-
     const firstRow = new ActionRowBuilder<TextInputBuilder>().addComponents(walletInput);
-    const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(signatureInput);
+    modal.addComponents(firstRow);
 
-    modal.addComponents(firstRow, secondRow);
+    // Only add signature field if required
+    if (config.verification.requireSignature) {
+      const signatureInput = new TextInputBuilder()
+        .setCustomId('signature')
+        .setLabel('Signature (from Snowtrace)')
+        .setPlaceholder('Paste the signature you got from Snowtrace here...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(signatureInput);
+      modal.addComponents(secondRow);
+    }
 
     await interaction.showModal(modal);
   }
@@ -174,7 +192,15 @@ export async function handleModal(
   }
 
   const walletAddress = interaction.fields.getTextInputValue('wallet_address').trim();
-  const signature = interaction.fields.getTextInputValue('signature')?.trim();
+
+  // Get signature only if the field exists
+  let signature: string | undefined;
+  try {
+    signature = interaction.fields.getTextInputValue('signature')?.trim();
+  } catch {
+    // Signature field doesn't exist (requireSignature is false)
+    signature = undefined;
+  }
 
   if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     await interaction.reply({
@@ -193,13 +219,25 @@ export async function handleModal(
     return;
   }
 
-  if (config.verification.requireSignature && signature) {
+  // Verify signature if required
+  if (config.verification.requireSignature) {
+    if (!signature) {
+      await interaction.reply({
+        content: '❌ Signature is required. Please sign the message on Snowtrace and paste the signature.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const timestamp = session.createdAt;
     const message = blockchain.generateSignatureMessage(session.nonce, timestamp);
 
     if (!blockchain.verifySignature(message, signature, walletAddress)) {
       await interaction.reply({
-        content: '❌ Signature verification failed. Make sure you signed the correct message with the correct wallet.',
+        content: '❌ Signature verification failed. Make sure you:\n' +
+          '1. Signed the exact message shown (copy it carefully)\n' +
+          '2. Used the same wallet address you entered\n' +
+          '3. Copied the full signature from Snowtrace',
         ephemeral: true,
       });
       return;
