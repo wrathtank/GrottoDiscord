@@ -134,8 +134,10 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
-      const guild = discordClient.guilds.cache.get(guildId);
+      // Use fetch instead of cache to ensure we get the guild
+      const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
       if (!guild) {
+        console.error(`[API] Could not find guild ${guildId}`);
         return res.json({
           success: true,
           message: 'Wallet linked successfully!',

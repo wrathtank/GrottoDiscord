@@ -150,9 +150,9 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
       return;
     }
 
-    const guild = client.guilds.cache.get(guildId);
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      console.log('[Scheduler] Could not find guild');
+      console.log('[Scheduler] Could not find guild:', guildId);
       return;
     }
 
