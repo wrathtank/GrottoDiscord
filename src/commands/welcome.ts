@@ -11,59 +11,36 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  // Main welcome embed with ASCII-style header
   const embed = new EmbedBuilder()
-    .setTitle('༺ THE GROTTO ༻')
+    .setTitle('THE GROTTO')
     .setDescription(
-      '```\n' +
-      '▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n' +
-      '█ WALLET VERIFICATION PORTAL █\n' +
-      '▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n' +
-      '```\n' +
-      '> *Verify your wallet to unlock exclusive roles*\n> *based on your on-chain holdings...*\n\n' +
-      '**🩸 SUPPORTED ASSETS**\n' +
-      '╔══════════════════════════╗\n' +
-      '║ ◈ `$HERESY` Token        ║\n' +
-      '║ ◈ Analog Distortions NFT ║\n' +
-      '║ ◈ Staked AD              ║\n' +
-      '╚══════════════════════════╝'
+      'Verify your wallet to unlock exclusive roles based on your holdings.\n\n' +
+      '**Supported Assets**\n' +
+      '• $HERESY Token\n' +
+      '• Analog Distortions NFT\n' +
+      '• Staked AD'
     )
     .setColor(0x8b0000)
     .addFields(
       {
-        name: '⛧ HOW TO VERIFY ⛧',
+        name: 'How to Verify',
         value:
-          '```diff\n' +
-          '+ Step 1: Type /verify\n' +
-          '+ Step 2: Click "🔥 Verify Wallet"\n' +
-          '+ Step 3: Connect wallet & sign\n' +
-          '+ Step 4: Roles assigned automatically!\n' +
-          '```',
+          '1. Type `/verify`\n' +
+          '2. Click the verify button\n' +
+          '3. Connect wallet & sign\n' +
+          '4. Roles assigned automatically',
         inline: false,
       },
       {
-        name: '🔄 UPDATE ROLES',
-        value: '> Holdings changed? Use `/refresh` anytime.',
-        inline: true,
-      },
-      {
-        name: '🔗 CHECK STATUS',
-        value: '> Use `/status` to view your wallet.',
-        inline: true,
-      },
-      {
-        name: '⚠️ TROUBLESHOOTING',
+        name: 'Commands',
         value:
-          '```\n' +
-          '• Wrong wallet? Use /unlink first\n' +
-          '• Roles not showing? Check /refresh\n' +
-          '• Still stuck? Contact a mod\n' +
-          '```',
+          '`/refresh` - Update your roles\n' +
+          '`/status` - Check your wallet\n' +
+          '`/unlink` - Disconnect wallet',
         inline: false,
       }
     )
-    .setFooter({ text: '🦴 GGrotto! • Descend into the darkness...' })
-    .setTimestamp();
+    .setFooter({ text: 'GGrotto!' });
 
   // Send to the channel (not ephemeral)
   await interaction.reply({ content: 'Welcome message posted!', ephemeral: true });

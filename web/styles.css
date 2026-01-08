@@ -130,8 +130,9 @@ body {
 
 /* Glitch text effect */
 .glitch-text {
-  font-family: 'Rubik Glitch', cursive;
+  font-family: 'Orbitron', sans-serif;
   font-size: 4rem;
+  font-weight: 900;
   color: var(--white);
   text-shadow: var(--glow);
   position: relative;
@@ -268,8 +269,9 @@ body {
 }
 
 .step h2 {
-  font-family: 'Rubik Glitch', cursive;
+  font-family: 'Orbitron', sans-serif;
   font-size: 1.8rem;
+  font-weight: 700;
   color: var(--red);
   margin-bottom: 15px;
   text-shadow: 0 0 10px var(--red);
