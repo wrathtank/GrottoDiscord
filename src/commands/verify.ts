@@ -66,26 +66,20 @@ export async function execute(
     .setFooter({ text: `Session expires in ${expiryMinutes} minutes • ID: ${sessionId.slice(0, 8)}` });
 
   if (config.verification.requireSignature) {
-    // Build the web verification URL
+    // Build the web verification URL with session info
     const webUrl = process.env.VERIFY_WEB_URL || 'https://grotto-verify.vercel.app';
-    const verifyLink = `${webUrl}?nonce=${nonce}&timestamp=${timestamp}`;
+    const apiUrl = process.env.API_URL || process.env.HEROKU_APP_URL || 'https://your-app.herokuapp.com';
+    const verifyLink = `${webUrl}?session=${sessionId}&nonce=${nonce}&timestamp=${timestamp}&api=${encodeURIComponent(apiUrl)}`;
 
     embed.addFields(
       {
-        name: '🔥 Step 1: Open Verification Page',
-        value: `**[Click here to verify your wallet](${verifyLink})**`,
+        name: '🔥 Click to Verify',
+        value: `**[Open Verification Page](${verifyLink})**`,
         inline: false,
       },
       {
-        name: '🔗 Step 2: Connect & Sign',
-        value: '• Connect your wallet (MetaMask, etc.)\n' +
-          '• Click "Sign Message" and approve\n' +
-          '• Copy the signature when complete',
-        inline: false,
-      },
-      {
-        name: '✅ Step 3: Submit Below',
-        value: 'Click the button and paste:\n• Your wallet address\n• The signature you copied',
+        name: '📋 Instructions',
+        value: '1. Connect your wallet\n2. Sign the message\n3. Done! Roles assigned automatically',
         inline: false,
       }
     );
@@ -100,8 +94,8 @@ export async function execute(
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`verify_start_${sessionId}`)
-      .setLabel(config.verification.requireSignature ? 'Enter Wallet & Signature' : 'Enter Wallet Address')
-      .setStyle(ButtonStyle.Primary)
+      .setLabel(config.verification.requireSignature ? 'Manual Entry (Backup)' : 'Enter Wallet Address')
+      .setStyle(config.verification.requireSignature ? ButtonStyle.Secondary : ButtonStyle.Primary)
       .setEmoji('🔗')
   );
 

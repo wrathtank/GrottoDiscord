@@ -25,10 +25,8 @@
   <!-- Main content -->
   <div class="container">
     <div class="logo-container">
-      <img src="images/grotto-skull.png" alt="The Grotto" class="logo glitch" data-text="GROTTO">
+      <h1 class="glitch-text" data-text="THE GROTTO">THE GROTTO</h1>
     </div>
-
-    <h1 class="glitch-text" data-text="THE GROTTO">THE GROTTO</h1>
     <p class="subtitle">WALLET VERIFICATION</p>
 
     <!-- Verification Card -->
@@ -52,18 +50,20 @@
         </button>
       </div>
 
+      <div id="step-verifying" class="step">
+        <h2>VERIFYING...</h2>
+        <p>Connecting to Discord bot...</p>
+        <div class="loading-spinner"></div>
+      </div>
+
       <div id="step-success" class="step">
         <h2 class="success-text">VERIFICATION COMPLETE</h2>
         <p>Your wallet has been verified!</p>
         <div class="wallet-display">
           <span id="verified-wallet"></span>
         </div>
-        <p class="return-text">Return to Discord and click "Submit" to complete verification</p>
-        <div class="signature-box">
-          <p>Your signature (copy this):</p>
-          <textarea id="signature-output" readonly></textarea>
-          <button id="btn-copy" class="btn-secondary">COPY SIGNATURE</button>
-        </div>
+        <div id="roles-assigned" class="roles-display"></div>
+        <p class="return-text">You can close this page and return to Discord!</p>
       </div>
 
       <div id="step-error" class="step">
@@ -80,13 +80,6 @@
       <span class="wallet-label">Connected:</span>
       <span id="wallet-address" class="wallet-address"></span>
     </div>
-  </div>
-
-  <!-- Floating skulls background -->
-  <div class="floating-skulls">
-    <img src="images/grotto-skull.png" class="floating-skull skull-1" alt="">
-    <img src="images/grotto-skull.png" class="floating-skull skull-2" alt="">
-    <img src="images/grotto-skull.png" class="floating-skull skull-3" alt="">
   </div>
 
   <!-- Custom cursor -->
