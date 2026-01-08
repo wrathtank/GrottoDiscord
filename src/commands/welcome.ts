@@ -11,43 +11,58 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  // Main welcome embed with ASCII-style header
   const embed = new EmbedBuilder()
-    .setTitle('🔥 Welcome to The Grotto 🔥')
+    .setTitle('༺ THE GROTTO ༻')
     .setDescription(
-      'Verify your wallet to unlock exclusive roles based on your holdings!\n\n' +
-      '**Supported Assets:**\n' +
-      '• $HERESY Token\n' +
-      '• Analog Distortions NFTs\n' +
-      '• Staked Analog Distortions\n'
+      '```\n' +
+      '▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n' +
+      '█ WALLET VERIFICATION PORTAL █\n' +
+      '▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n' +
+      '```\n' +
+      '> *Verify your wallet to unlock exclusive roles*\n> *based on your on-chain holdings...*\n\n' +
+      '**🩸 SUPPORTED ASSETS**\n' +
+      '╔══════════════════════════╗\n' +
+      '║ ◈ `$HERESY` Token        ║\n' +
+      '║ ◈ Analog Distortions NFT ║\n' +
+      '║ ◈ Staked AD              ║\n' +
+      '╚══════════════════════════╝'
     )
-    .setColor(0xff0033)
+    .setColor(0x8b0000)
     .addFields(
       {
-        name: '📋 How to Verify',
+        name: '⛧ HOW TO VERIFY ⛧',
         value:
-          '**1.** Type `/verify` in any channel\n' +
-          '**2.** Click the **"🔥 Verify Wallet"** button\n' +
-          '**3.** Connect your wallet on the verification page\n' +
-          '**4.** Sign the message (this proves you own the wallet)\n' +
-          '**5.** Done! Your roles will be assigned automatically',
+          '```diff\n' +
+          '+ Step 1: Type /verify\n' +
+          '+ Step 2: Click "🔥 Verify Wallet"\n' +
+          '+ Step 3: Connect wallet & sign\n' +
+          '+ Step 4: Roles assigned automatically!\n' +
+          '```',
         inline: false,
       },
       {
-        name: '🔄 Update Your Roles',
-        value:
-          'Holdings changed? Use `/refresh` to update your roles anytime.',
-        inline: false,
+        name: '🔄 UPDATE ROLES',
+        value: '> Holdings changed? Use `/refresh` anytime.',
+        inline: true,
       },
       {
-        name: '❓ Need Help?',
+        name: '🔗 CHECK STATUS',
+        value: '> Use `/status` to view your wallet.',
+        inline: true,
+      },
+      {
+        name: '⚠️ TROUBLESHOOTING',
         value:
-          '• Make sure you\'re using the wallet with your assets\n' +
-          '• Use `/status` to check your linked wallet\n' +
-          '• Use `/unlink` to disconnect and start fresh',
+          '```\n' +
+          '• Wrong wallet? Use /unlink first\n' +
+          '• Roles not showing? Check /refresh\n' +
+          '• Still stuck? Contact a mod\n' +
+          '```',
         inline: false,
       }
     )
-    .setFooter({ text: 'GGrotto! 🦴' })
+    .setFooter({ text: '🦴 GGrotto! • Descend into the darkness...' })
     .setTimestamp();
 
   // Send to the channel (not ephemeral)
