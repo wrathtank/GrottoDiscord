@@ -84,12 +84,7 @@ export async function execute(
       new ButtonBuilder()
         .setLabel('🔥 Verify Wallet')
         .setStyle(ButtonStyle.Link)
-        .setURL(verifyLink),
-      new ButtonBuilder()
-        .setCustomId(`verify_start_${sessionId}`)
-        .setLabel('Manual Entry')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔗')
+        .setURL(verifyLink)
     );
 
     await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });

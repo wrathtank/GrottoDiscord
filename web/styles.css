@@ -219,7 +219,27 @@ body {
   text-shadow: 0 0 10px var(--red);
 }
 
+/* Landing page (no session) */
+.landing-page {
+  text-align: center;
+  padding: 40px;
+}
+
+.landing-page.hidden {
+  display: none;
+}
+
+.landing-text {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.8rem;
+  color: #666;
+  letter-spacing: 2px;
+}
+
 /* Card */
+.card.hidden {
+  display: none;
+}
 .card {
   background: linear-gradient(145deg, var(--gray), var(--darker));
   border: 2px solid var(--dark-red);

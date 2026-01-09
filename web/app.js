@@ -66,6 +66,8 @@ Timestamp: ${timestamp}`;
 }
 
 // DOM Elements
+const landingPage = document.getElementById('landing-page');
+const verificationCard = document.getElementById('verification-card');
 const stepConnect = document.getElementById('step-connect');
 const stepSign = document.getElementById('step-sign');
 const stepVerifying = document.getElementById('step-verifying');
@@ -82,6 +84,17 @@ const rolesAssigned = document.getElementById('roles-assigned');
 const errorMessage = document.getElementById('error-message');
 const walletInfo = document.getElementById('wallet-info');
 const walletAddressDisplay = document.getElementById('wallet-address');
+
+// Check if we have a valid session - show landing or verification
+if (sessionId && apiUrl) {
+  // Valid session from Discord - show verification flow
+  verificationCard.classList.remove('hidden');
+  landingPage.classList.add('hidden');
+} else {
+  // No session - show landing page
+  landingPage.classList.remove('hidden');
+  verificationCard.classList.add('hidden');
+}
 
 // Show step
 function showStep(step) {
@@ -198,8 +211,7 @@ async function signMessageWithWallet() {
 async function submitVerification() {
   try {
     if (!apiUrl || !sessionId) {
-      console.log('No API URL or session ID, showing manual fallback');
-      showManualFallback('No API URL configured. Please use manual verification.');
+      showError('Invalid session. Please use /verify in Discord to get a new link.');
       return;
     }
 
@@ -256,61 +268,7 @@ async function submitVerification() {
 
   } catch (error) {
     console.error('API error:', error);
-    // Show manual fallback on network error
-    showManualFallback(`Could not connect to server: ${error.message}`);
-  }
-}
-
-// Show manual fallback when API fails
-function showManualFallback(reason) {
-  verifiedWallet.textContent = formatAddress(walletAddress);
-
-  // Build fallback UI safely without innerHTML injection risks
-  rolesAssigned.innerHTML = '';
-
-  const reasonP = document.createElement('p');
-  reasonP.style.color = '#ff6600';
-  reasonP.textContent = reason || 'Could not connect to bot automatically.';
-
-  const instructionP = document.createElement('p');
-  instructionP.textContent = 'Copy this signature and paste it in Discord using the Manual Entry button:';
-
-  const textarea = document.createElement('textarea');
-  textarea.id = 'signature-output';
-  textarea.readOnly = true;
-  textarea.style.cssText = 'width:100%;height:60px;margin:10px 0;background:#1a1a1a;color:#fff;border:1px solid #ff0033;padding:8px;font-size:11px;';
-  textarea.value = signature;
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'btn-secondary';
-  copyBtn.style.marginTop = '5px';
-  copyBtn.textContent = 'COPY SIGNATURE';
-  copyBtn.onclick = copySignature;
-
-  const walletP = document.createElement('p');
-  walletP.style.cssText = 'font-size:0.5rem;margin-top:10px;color:#888;';
-  walletP.textContent = `Wallet: ${walletAddress}`;
-
-  rolesAssigned.appendChild(reasonP);
-  rolesAssigned.appendChild(instructionP);
-  rolesAssigned.appendChild(textarea);
-  rolesAssigned.appendChild(copyBtn);
-  rolesAssigned.appendChild(walletP);
-
-  showStep(stepSuccess);
-}
-
-// Copy signature fallback
-function copySignature() {
-  const textarea = document.getElementById('signature-output');
-  if (textarea) {
-    textarea.select();
-    textarea.setSelectionRange(0, 99999); // For mobile
-    document.execCommand('copy');
-    event.target.textContent = 'COPIED!';
-    setTimeout(() => {
-      event.target.textContent = 'COPY SIGNATURE';
-    }, 2000);
+    showError(`Connection failed: ${error.message}. Please try again.`);
   }
 }
 
@@ -339,10 +297,6 @@ if (window.ethereum) {
   });
 }
 
-// Check if we have valid session params - but don't block if missing
-if (!sessionId) {
-  console.warn('No session ID in URL - manual fallback will be used');
-}
 
 // ============================================
 // VISUAL EFFECTS
