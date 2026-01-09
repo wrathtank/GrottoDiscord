@@ -236,6 +236,52 @@ body {
   letter-spacing: 2px;
 }
 
+.discord-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 30px;
+  padding: 15px 30px;
+  background: linear-gradient(145deg, var(--gray), var(--darker));
+  border: 2px solid var(--dark-red);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  cursor: none;
+}
+
+.discord-link:hover {
+  border-color: var(--red);
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.4), 0 0 40px rgba(139, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.discord-icon {
+  width: 32px;
+  height: 32px;
+  fill: var(--red);
+  filter: drop-shadow(0 0 5px var(--red));
+  transition: all 0.3s ease;
+}
+
+.discord-link:hover .discord-icon {
+  fill: var(--white);
+  filter: drop-shadow(0 0 10px var(--red));
+}
+
+.discord-link span {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.7rem;
+  color: var(--red);
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+}
+
+.discord-link:hover span {
+  color: var(--white);
+  text-shadow: 0 0 10px var(--red);
+}
+
 /* Card */
 .card.hidden {
   display: none;
