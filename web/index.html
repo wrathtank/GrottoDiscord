@@ -29,8 +29,13 @@
     </div>
     <p class="subtitle">WALLET VERIFICATION</p>
 
-    <!-- Verification Card -->
-    <div class="card">
+    <!-- Landing page (no session) -->
+    <div id="landing-page" class="landing-page hidden">
+      <p class="landing-text">Use /verify in Discord to get started</p>
+    </div>
+
+    <!-- Verification Card (only shown with valid session) -->
+    <div id="verification-card" class="card hidden">
       <div id="step-connect" class="step active">
         <h2>CONNECT YOUR WALLET</h2>
         <p>Link your wallet to verify your holdings</p>
