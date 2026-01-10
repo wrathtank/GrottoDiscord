@@ -29,6 +29,16 @@ const ERC404_ABI = [
   'function erc721BalanceOf(address owner) view returns (uint256)',
 ];
 
+// Mapping of NFT contracts to their staking contracts
+// When checking ERC721 balance, also check staked balance and combine them
+const NFT_STAKING_MAP: Record<string, { stakingContract: string; method: string }> = {
+  // Analog Distortions NFT -> AD Staking Contract
+  '0x0a337be2ea71e3aea9c82d45b036ac6a6123b6d0': {
+    stakingContract: '0x51697170f78136c8d143b0013cf5b229ade70757',
+    method: 'stakers',
+  },
+};
+
 interface ChainProviders {
   primary: JsonRpcProvider;
   secondary?: JsonRpcProvider;
@@ -107,40 +117,61 @@ export class BlockchainService {
 
   async getERC721Balance(contractAddress: string, walletAddress: string, chainId?: string): Promise<bigint> {
     const { primary, secondary } = this.getProviders(chainId);
+    const normalizedContract = contractAddress.toLowerCase();
 
     // Try primary RPC first
+    let walletBalance: bigint;
     try {
       const contract = new Contract(contractAddress, ERC721_ABI, primary);
-      const balance = await contract.balanceOf(walletAddress);
-      console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (primary): ${balance.toString()}`);
+      walletBalance = await contract.balanceOf(walletAddress);
+      console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (primary): ${walletBalance.toString()}`);
 
       // If balance is 0 and we have a secondary RPC, double-check
-      // This helps catch cases where the primary RPC returns stale/incorrect data
-      if (balance === 0n && secondary) {
+      if (walletBalance === 0n && secondary) {
         console.log(`[Blockchain] ERC721 balance is 0, double-checking with secondary RPC...`);
         const secondaryContract = new Contract(contractAddress, ERC721_ABI, secondary);
         const secondaryBalance = await secondaryContract.balanceOf(walletAddress);
         console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (secondary): ${secondaryBalance.toString()}`);
 
-        // If secondary shows a balance but primary didn't, use the secondary result
         if (secondaryBalance > 0n) {
           console.log(`[Blockchain] Secondary RPC shows balance, using that instead`);
-          return secondaryBalance;
+          walletBalance = secondaryBalance;
         }
       }
-
-      return balance;
     } catch (primaryError) {
-      // Primary failed, try secondary
       if (secondary) {
         console.warn(`[Blockchain] Primary RPC failed for ERC721 check on "${chainId || this.defaultChain}", trying secondary`);
         const contract = new Contract(contractAddress, ERC721_ABI, secondary);
-        const balance = await contract.balanceOf(walletAddress);
-        console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (secondary fallback): ${balance.toString()}`);
-        return balance;
+        walletBalance = await contract.balanceOf(walletAddress);
+        console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (secondary fallback): ${walletBalance.toString()}`);
+      } else {
+        throw primaryError;
       }
-      throw primaryError;
     }
+
+    // Check if this NFT has an associated staking contract
+    // If so, also check staked balance and combine them
+    const stakingInfo = NFT_STAKING_MAP[normalizedContract];
+    if (stakingInfo) {
+      try {
+        const stakedBalance = await this.getStakedBalance(
+          stakingInfo.stakingContract,
+          walletAddress,
+          stakingInfo.method,
+          chainId
+        );
+        console.log(`[Blockchain] Adding staked balance ${stakedBalance.toString()} to wallet balance ${walletBalance.toString()}`);
+        const totalBalance = walletBalance + stakedBalance;
+        console.log(`[Blockchain] Total ERC721 + staked balance: ${totalBalance.toString()}`);
+        return totalBalance;
+      } catch (stakingError) {
+        console.warn(`[Blockchain] Failed to check staking contract, using wallet balance only:`, stakingError);
+        // If staking check fails, just return wallet balance
+        return walletBalance;
+      }
+    }
+
+    return walletBalance;
   }
 
   async getERC1155Balance(
