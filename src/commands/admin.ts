@@ -65,6 +65,11 @@ export const data = new SlashCommandBuilder()
     subcommand
       .setName('roles')
       .setDescription('List all configured roles and their requirements')
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName('refreshlog')
+      .setDescription('Refresh all wallets with detailed diagnostic output')
   );
 
 export async function execute(
@@ -95,6 +100,9 @@ export async function execute(
       break;
     case 'roles':
       await handleRoles(interaction, config);
+      break;
+    case 'refreshlog':
+      await handleRefreshLog(interaction, blockchain, config);
       break;
   }
 }
@@ -412,4 +420,130 @@ async function handleRoles(
   }
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+async function handleRefreshLog(
+  interaction: ChatInputCommandInteraction,
+  blockchain: BlockchainService,
+  config: BotConfig
+) {
+  const allWallets = await getAllLinkedWallets();
+
+  if (allWallets.length === 0) {
+    await interaction.reply({
+      content: '❌ No linked wallets to refresh.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  let guild = interaction.guild;
+  if (!guild && process.env.DISCORD_GUILD_ID) {
+    guild = await interaction.client.guilds.fetch(process.env.DISCORD_GUILD_ID).catch(() => null);
+  }
+  if (!guild) {
+    await interaction.editReply({ content: '❌ Could not find guild.' });
+    return;
+  }
+
+  const logLines: string[] = [];
+  logLines.push(`=== REFRESH LOG ${new Date().toISOString()} ===`);
+  logLines.push(`Total wallets: ${allWallets.length}`);
+  logLines.push(`Configured roles: ${config.roles.map(r => r.name).join(', ')}`);
+  logLines.push('');
+
+  let processed = 0;
+  let errors = 0;
+  let rolesAdded = 0;
+  let rolesRemoved = 0;
+  let skippedDueToError = 0;
+
+  for (const wallet of allWallets) {
+    try {
+      if (processed > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const member = await guild.members.fetch(wallet.discordId).catch(() => null);
+      const memberName = member?.user?.tag || wallet.discordId;
+
+      logLines.push(`--- ${memberName} ---`);
+      logLines.push(`Wallet: ${wallet.walletAddress}`);
+
+      let results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+
+      const hasErrors = results.some(r => r.error);
+      if (hasErrors) {
+        logLines.push(`⚠️ RPC errors detected, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+      }
+
+      for (const result of results) {
+        const roleConfig = config.roles.find((r) => r.id === result.roleId);
+        if (!roleConfig) continue;
+
+        const discordRole = guild.roles.cache.get(roleConfig.discordRoleId);
+        const hasRole = member ? member.roles.cache.has(discordRole?.id || '') : false;
+
+        // Log each requirement detail
+        logLines.push(`  ${result.roleName}:`);
+        for (const detail of result.details) {
+          const status = detail.passed ? '✅' : (detail.error ? '⚠️' : '❌');
+          logLines.push(`    ${status} ${detail.type} ${detail.contractAddress.slice(0, 10)}...`);
+          logLines.push(`       Required: ${detail.required}, Actual: ${detail.actual}${detail.error ? ' (ERROR)' : ''}`);
+        }
+        logLines.push(`    Qualified: ${result.qualified ? 'YES' : 'NO'}${result.error ? ' (with errors)' : ''}`);
+        logLines.push(`    Has Role: ${hasRole ? 'YES' : 'NO'}`);
+
+        if (member && discordRole) {
+          if (result.qualified && !hasRole) {
+            await member.roles.add(discordRole);
+            rolesAdded++;
+            logLines.push(`    ACTION: ➕ Added role`);
+          } else if (!result.qualified && hasRole && config.verification.autoRevokeOnFailure) {
+            if (result.error) {
+              skippedDueToError++;
+              logLines.push(`    ACTION: ⏭️ Skipped removal (RPC error)`);
+            } else {
+              await member.roles.remove(discordRole);
+              rolesRemoved++;
+              logLines.push(`    ACTION: ➖ Removed role`);
+            }
+          } else {
+            logLines.push(`    ACTION: No change needed`);
+          }
+        }
+      }
+
+      logLines.push('');
+      processed++;
+    } catch (error) {
+      logLines.push(`❌ ERROR: ${error instanceof Error ? error.message : String(error)}`);
+      logLines.push('');
+      errors++;
+    }
+  }
+
+  logLines.push('=== SUMMARY ===');
+  logLines.push(`Processed: ${processed}/${allWallets.length}`);
+  logLines.push(`Errors: ${errors}`);
+  logLines.push(`Roles Added: ${rolesAdded}`);
+  logLines.push(`Roles Removed: ${rolesRemoved}`);
+  logLines.push(`Skipped (RPC Error): ${skippedDueToError}`);
+
+  const logContent = logLines.join('\n');
+
+  // Discord has a 2000 char limit for messages, so send as file attachment
+  const buffer = Buffer.from(logContent, 'utf-8');
+
+  await interaction.editReply({
+    content: `✅ Refresh complete. See attached log file.`,
+    files: [{
+      attachment: buffer,
+      name: `refresh-log-${Date.now()}.txt`,
+    }],
+  });
 }
