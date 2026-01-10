@@ -182,6 +182,18 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
         const member = await guild.members.fetch(wallet.discordId).catch(() => null);
 
         if (member) {
+          // First pass: collect all Discord role IDs that the user qualifies for
+          const qualifiedDiscordRoleIds = new Set<string>();
+          for (const result of results) {
+            if (result.qualified) {
+              const roleConfig = config.roles.find((r) => r.id === result.roleId);
+              if (roleConfig) {
+                qualifiedDiscordRoleIds.add(roleConfig.discordRoleId);
+              }
+            }
+          }
+
+          // Second pass: add/remove roles
           for (const result of results) {
             const roleConfig = config.roles.find((r) => r.id === result.roleId);
             if (!roleConfig) continue;
@@ -200,6 +212,9 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
               if (result.error) {
                 console.log(`[Scheduler] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - verification error`);
                 skippedDueToError++;
+              } else if (qualifiedDiscordRoleIds.has(roleConfig.discordRoleId)) {
+                // Don't remove if another config entry qualified for same Discord role
+                console.log(`[Scheduler] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - qualified via another config`);
               } else {
                 await member.roles.remove(discordRole);
                 rolesRemoved++;
