@@ -334,6 +334,19 @@ async function handleRefreshAll(
       const member = await guild.members.fetch(wallet.discordId).catch(() => null);
 
       if (member) {
+        // First pass: collect all Discord role IDs that the user qualifies for
+        // This handles cases where multiple config entries share the same Discord role
+        const qualifiedDiscordRoleIds = new Set<string>();
+        for (const result of results) {
+          if (result.qualified) {
+            const roleConfig = config.roles.find((r) => r.id === result.roleId);
+            if (roleConfig) {
+              qualifiedDiscordRoleIds.add(roleConfig.discordRoleId);
+            }
+          }
+        }
+
+        // Second pass: add/remove roles
         for (const result of results) {
           const roleConfig = config.roles.find((r) => r.id === result.roleId);
           if (!roleConfig) continue;
@@ -352,6 +365,9 @@ async function handleRefreshAll(
             if (result.error) {
               console.log(`[Admin] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - verification error`);
               skippedDueToError++;
+            } else if (qualifiedDiscordRoleIds.has(roleConfig.discordRoleId)) {
+              // Don't remove if another config entry qualified for same Discord role
+              console.log(`[Admin] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - qualified via another config`);
             } else {
               await member.roles.remove(discordRole);
               rolesRemoved++;
@@ -481,6 +497,17 @@ async function handleRefreshLog(
         results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
       }
 
+      // First pass: collect all Discord role IDs that the user qualifies for
+      const qualifiedDiscordRoleIds = new Set<string>();
+      for (const result of results) {
+        if (result.qualified) {
+          const roleConfig = config.roles.find((r) => r.id === result.roleId);
+          if (roleConfig) {
+            qualifiedDiscordRoleIds.add(roleConfig.discordRoleId);
+          }
+        }
+      }
+
       for (const result of results) {
         const roleConfig = config.roles.find((r) => r.id === result.roleId);
         if (!roleConfig) continue;
@@ -507,6 +534,8 @@ async function handleRefreshLog(
             if (result.error) {
               skippedDueToError++;
               logLines.push(`    ACTION: ⏭️ Skipped removal (RPC error)`);
+            } else if (qualifiedDiscordRoleIds.has(roleConfig.discordRoleId)) {
+              logLines.push(`    ACTION: ⏭️ Skipped removal (qualified via other config)`);
             } else {
               await member.roles.remove(discordRole);
               rolesRemoved++;
