@@ -354,6 +354,78 @@ function createCursorParticle() {
 
 setInterval(createCursorParticle, 50);
 
+// Click/hold particle burst effect
+let isMouseDown = false;
+let clickParticleInterval = null;
+
+function createClickParticle() {
+  const colors = ['#ff0033', '#ff6600', '#ffcc00', '#ff4400', '#ff8800'];
+  const particle = document.createElement('div');
+  particle.className = 'click-particle';
+  const size = Math.random() * 4 + 2;
+  particle.style.cssText = `
+    position: fixed;
+    width: ${size}px;
+    height: ${size}px;
+    background: ${colors[Math.floor(Math.random() * colors.length)]};
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    left: ${cursorX}px;
+    top: ${cursorY}px;
+    opacity: 1;
+    box-shadow: 0 0 ${size}px currentColor;
+  `;
+  document.body.appendChild(particle);
+
+  // Random direction burst
+  const angle = Math.random() * Math.PI * 2;
+  const velocity = Math.random() * 80 + 40;
+  const vx = Math.cos(angle) * velocity;
+  const vy = Math.sin(angle) * velocity;
+
+  let x = 0, y = 0, opacity = 1;
+  const animate = () => {
+    x += vx * 0.02;
+    y += vy * 0.02 + 1; // slight gravity
+    opacity -= 0.03;
+    particle.style.transform = `translate(${x}px, ${y}px)`;
+    particle.style.opacity = opacity;
+    if (opacity > 0) {
+      requestAnimationFrame(animate);
+    } else {
+      particle.remove();
+    }
+  };
+  requestAnimationFrame(animate);
+}
+
+function startClickParticles() {
+  isMouseDown = true;
+  // Burst on initial click
+  for (let i = 0; i < 8; i++) {
+    createClickParticle();
+  }
+  // Continue spawning while held
+  clickParticleInterval = setInterval(() => {
+    for (let i = 0; i < 3; i++) {
+      createClickParticle();
+    }
+  }, 30);
+}
+
+function stopClickParticles() {
+  isMouseDown = false;
+  if (clickParticleInterval) {
+    clearInterval(clickParticleInterval);
+    clickParticleInterval = null;
+  }
+}
+
+document.addEventListener('mousedown', startClickParticles);
+document.addEventListener('mouseup', stopClickParticles);
+document.addEventListener('mouseleave', stopClickParticles);
+
 // Background particles
 const particlesContainer = document.getElementById('particles');
 
