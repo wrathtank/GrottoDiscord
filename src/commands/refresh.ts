@@ -55,6 +55,19 @@ export async function execute(
   const keptRoles: string[] = [];
   const embeds: EmbedBuilder[] = [];
 
+  // First pass: collect all Discord role IDs that the user qualifies for
+  // This handles cases where multiple config entries share the same Discord role
+  const qualifiedDiscordRoleIds = new Set<string>();
+  for (const result of results) {
+    if (result.qualified) {
+      const roleConfig = config.roles.find((r) => r.id === result.roleId);
+      if (roleConfig) {
+        qualifiedDiscordRoleIds.add(roleConfig.discordRoleId);
+      }
+    }
+  }
+
+  // Second pass: add/remove roles
   for (const result of results) {
     const roleConfig = config.roles.find((r) => r.id === result.roleId);
     if (!roleConfig) continue;
@@ -103,12 +116,17 @@ export async function execute(
       }
     } else {
       if (hasRole && config.verification.autoRevokeOnFailure) {
-        try {
-          await member.roles.remove(discordRole);
-          await removeRoleAssignment(interaction.user.id, roleConfig.id);
-          removedRoles.push(roleConfig.name);
-        } catch (error) {
-          console.error(`[Refresh] Failed to remove role ${roleConfig.name}:`, error);
+        // Don't remove if another config entry qualified for same Discord role
+        if (qualifiedDiscordRoleIds.has(roleConfig.discordRoleId)) {
+          keptRoles.push(roleConfig.name);
+        } else {
+          try {
+            await member.roles.remove(discordRole);
+            await removeRoleAssignment(interaction.user.id, roleConfig.id);
+            removedRoles.push(roleConfig.name);
+          } catch (error) {
+            console.error(`[Refresh] Failed to remove role ${roleConfig.name}:`, error);
+          }
         }
       }
     }
