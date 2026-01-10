@@ -106,10 +106,41 @@ export class BlockchainService {
   }
 
   async getERC721Balance(contractAddress: string, walletAddress: string, chainId?: string): Promise<bigint> {
-    return this.withFallback(chainId, async (provider) => {
-      const contract = new Contract(contractAddress, ERC721_ABI, provider);
-      return await contract.balanceOf(walletAddress);
-    });
+    const { primary, secondary } = this.getProviders(chainId);
+
+    // Try primary RPC first
+    try {
+      const contract = new Contract(contractAddress, ERC721_ABI, primary);
+      const balance = await contract.balanceOf(walletAddress);
+      console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (primary): ${balance.toString()}`);
+
+      // If balance is 0 and we have a secondary RPC, double-check
+      // This helps catch cases where the primary RPC returns stale/incorrect data
+      if (balance === 0n && secondary) {
+        console.log(`[Blockchain] ERC721 balance is 0, double-checking with secondary RPC...`);
+        const secondaryContract = new Contract(contractAddress, ERC721_ABI, secondary);
+        const secondaryBalance = await secondaryContract.balanceOf(walletAddress);
+        console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (secondary): ${secondaryBalance.toString()}`);
+
+        // If secondary shows a balance but primary didn't, use the secondary result
+        if (secondaryBalance > 0n) {
+          console.log(`[Blockchain] Secondary RPC shows balance, using that instead`);
+          return secondaryBalance;
+        }
+      }
+
+      return balance;
+    } catch (primaryError) {
+      // Primary failed, try secondary
+      if (secondary) {
+        console.warn(`[Blockchain] Primary RPC failed for ERC721 check on "${chainId || this.defaultChain}", trying secondary`);
+        const contract = new Contract(contractAddress, ERC721_ABI, secondary);
+        const balance = await contract.balanceOf(walletAddress);
+        console.log(`[Blockchain] ERC721 balanceOf ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (secondary fallback): ${balance.toString()}`);
+        return balance;
+      }
+      throw primaryError;
+    }
   }
 
   async getERC1155Balance(
@@ -145,17 +176,21 @@ export class BlockchainService {
       `function ${method}(address account) view returns (uint256)`,
     ];
 
-    return this.withFallback(chainId, async (provider) => {
+    const { primary, secondary } = this.getProviders(chainId);
+
+    const checkWithProvider = async (provider: JsonRpcProvider, label: string): Promise<bigint> => {
       const contract = new Contract(contractAddress, stakingAbi, provider);
 
       if (typeof contract[method] === 'function') {
         const result = await contract[method](walletAddress);
-        // Handle tuple returns (e.g., stakers mapping returns multiple values)
-        // The first value is typically the staked amount
+        let balance: bigint;
         if (Array.isArray(result)) {
-          return BigInt(result[0]);
+          balance = BigInt(result[0]);
+        } else {
+          balance = BigInt(result);
         }
-        return BigInt(result);
+        console.log(`[Blockchain] Staked ${method} ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (${label}): ${balance.toString()}`);
+        return balance;
       }
 
       for (const abiEntry of stakingAbi) {
@@ -163,10 +198,14 @@ export class BlockchainService {
         if (match && typeof contract[match[1]] === 'function') {
           try {
             const result = await contract[match[1]](walletAddress);
+            let balance: bigint;
             if (Array.isArray(result)) {
-              return BigInt(result[0]);
+              balance = BigInt(result[0]);
+            } else {
+              balance = BigInt(result);
             }
-            return BigInt(result);
+            console.log(`[Blockchain] Staked ${match[1]} ${contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${chainId || this.defaultChain} (${label}): ${balance.toString()}`);
+            return balance;
           } catch {
             continue;
           }
@@ -174,7 +213,33 @@ export class BlockchainService {
       }
 
       throw new Error(`No valid staking method found for contract ${contractAddress}`);
-    });
+    };
+
+    try {
+      const balance = await checkWithProvider(primary, 'primary');
+
+      // If balance is 0 and we have a secondary, double-check
+      if (balance === 0n && secondary) {
+        console.log(`[Blockchain] Staked balance is 0, double-checking with secondary RPC...`);
+        try {
+          const secondaryBalance = await checkWithProvider(secondary, 'secondary');
+          if (secondaryBalance > 0n) {
+            console.log(`[Blockchain] Secondary RPC shows staked balance, using that instead`);
+            return secondaryBalance;
+          }
+        } catch {
+          // Secondary check failed, stick with primary result
+        }
+      }
+
+      return balance;
+    } catch (primaryError) {
+      if (secondary) {
+        console.warn(`[Blockchain] Primary RPC failed for staked check on "${chainId || this.defaultChain}", trying secondary`);
+        return await checkWithProvider(secondary, 'secondary fallback');
+      }
+      throw primaryError;
+    }
   }
 
   async checkRequirement(
