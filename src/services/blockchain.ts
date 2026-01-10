@@ -236,6 +236,7 @@ export class BlockchainService {
         required: requirement.minBalance,
         actual: '0',
         passed: false,
+        error: true, // Mark as error so we don't incorrectly remove roles
       };
     }
   }
@@ -245,6 +246,9 @@ export class BlockchainService {
     const results = await Promise.all(
       role.requirements.map(req => this.checkRequirement(req, walletAddress))
     );
+
+    // Check if any requirement had an error
+    const hasError = results.some((r) => r.error);
 
     let qualified: boolean;
     if (role.requireAll) {
@@ -258,6 +262,7 @@ export class BlockchainService {
       roleName: role.name,
       qualified,
       details: results,
+      error: hasError, // Propagate error flag
     };
   }
 
