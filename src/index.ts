@@ -158,10 +158,27 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
 
     let processed = 0;
     let errors = 0;
+    let rolesAdded = 0;
+    let rolesRemoved = 0;
+    let skippedDueToError = 0;
 
     for (const wallet of allWallets) {
       try {
-        const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+        // Add a small delay between wallets to avoid rate limiting
+        if (processed > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        let results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+
+        // Retry once if there were errors
+        const hasErrors = results.some(r => r.error);
+        if (hasErrors) {
+          console.log(`[Scheduler] Retrying verification for ${wallet.walletAddress.slice(0, 8)}... due to errors`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+        }
+
         const member = await guild.members.fetch(wallet.discordId).catch(() => null);
 
         if (member) {
@@ -176,18 +193,28 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
 
             if (result.qualified && !hasRole) {
               await member.roles.add(discordRole);
+              rolesAdded++;
             } else if (!result.qualified && hasRole && config.verification.autoRevokeOnFailure) {
-              await member.roles.remove(discordRole);
+              // IMPORTANT: Don't remove role if there was an error checking
+              // Only remove if we successfully verified they don't qualify
+              if (result.error) {
+                console.log(`[Scheduler] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - verification error`);
+                skippedDueToError++;
+              } else {
+                await member.roles.remove(discordRole);
+                rolesRemoved++;
+              }
             }
           }
         }
         processed++;
       } catch (error) {
         errors++;
+        console.error(`[Scheduler] Error processing wallet ${wallet.walletAddress.slice(0, 8)}...:`, error);
       }
     }
 
-    console.log(`[Scheduler] Refresh complete: ${processed} processed, ${errors} errors`);
+    console.log(`[Scheduler] Refresh complete: ${processed} wallets, +${rolesAdded} roles, -${rolesRemoved} roles, ${skippedDueToError} skipped (errors), ${errors} failures`);
   } catch (error) {
     console.error('[Scheduler] Error during scheduled refresh:', error);
   }

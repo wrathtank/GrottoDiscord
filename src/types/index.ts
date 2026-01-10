@@ -96,6 +96,7 @@ export interface VerificationResult {
   roleName: string;
   qualified: boolean;
   details: RequirementResult[];
+  error?: boolean; // True if verification failed due to RPC/network error
 }
 
 export interface RequirementResult {
@@ -104,6 +105,7 @@ export interface RequirementResult {
   required: string;
   actual: string;
   passed: boolean;
+  error?: boolean; // True if check failed due to RPC/network error
 }
 
 export interface RpcConfig {
