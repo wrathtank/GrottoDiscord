@@ -53,13 +53,13 @@ interface CrossChainToken {
 const ERC20_CROSS_CHAIN_MAP: Record<string, CrossChainToken[]> = {
   // HERESY on AVAX -> also check Wrapped HERESY, Native HERESY, and Staked HERESY on Grotto L1
   '0x432d38f83a50ec77c409d086e97448794cf76dcf': [
-    { contractAddress: '0xbA90A70ba89Ea3A2b2e9B9ebcD16239aAA531042', chainId: 'grotto' },  // Wrapped HERESY
+    { contractAddress: '0xfa99b368b5fc1f5a061bc393dff73be8a097667d', chainId: 'grotto' },  // Wrapped HERESY (wHERESY)
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
     { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
-  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX, native + staked on Grotto
-  '0xba90a70ba89ea3a2b2e9b9ebcd16239aaa531042': [
-    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },  // Native HERESY on AVAX
+  // Wrapped HERESY (wHERESY) on Grotto L1 -> also check HERESY on AVAX, native + staked on Grotto
+  '0xfa99b368b5fc1f5a061bc393dff73be8a097667d': [
+    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },  // HERESY on AVAX C-Chain
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
     { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
