@@ -182,16 +182,16 @@ export class BlockchainService {
               const contractAddr = equivalent.contractAddress!;
 
               // Try different staking ABIs in order of likelihood
-              // Grotto L1 staking contract uses stakes(address) - selector 0x16934fc4
+              // Grotto L1 staking contract uses stakes(address) returning simple uint256 - selector 0x16934fc4
               const stakingMethods = [
+                // Simple stakes returning uint256 (Grotto L1 staking contract uses this)
+                { abi: ['function stakes(address user) view returns (uint256)'], method: 'stakes', tupleIndex: null },
                 // stakes() returning tuple with amount and timestamp
                 { abi: ['function stakes(address user) view returns (uint256 amount, uint256 timestamp)'], method: 'stakes', tupleIndex: 0 },
                 // stakes() returning tuple with amount, rewards
                 { abi: ['function stakes(address user) view returns (uint256 amount, uint256 rewards)'], method: 'stakes', tupleIndex: 0 },
                 // stakes() returning tuple with amount, rewardDebt (MasterChef-style)
                 { abi: ['function stakes(address user) view returns (uint256 amount, uint256 rewardDebt)'], method: 'stakes', tupleIndex: 0 },
-                // Simple stakes returning uint256
-                { abi: ['function stakes(address user) view returns (uint256)'], method: 'stakes', tupleIndex: null },
                 // Thirdweb staking - stakers() returns tuple
                 { abi: ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'], method: 'stakers', tupleIndex: 0 },
                 // Thirdweb ERC20 staking - getStakeInfo returns tuple

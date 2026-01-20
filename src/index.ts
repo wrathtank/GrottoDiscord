@@ -156,6 +156,9 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
       return;
     }
 
+    // Fetch all guild roles to populate the cache
+    await guild.roles.fetch();
+
     // Group wallets by Discord user for multi-wallet verification
     const walletsByUser = new Map<string, string[]>();
     for (const wallet of allWallets) {

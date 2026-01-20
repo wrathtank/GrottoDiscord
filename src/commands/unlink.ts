@@ -146,6 +146,9 @@ export async function handleButton(
     const guild = interaction.guild;
     if (guild) {
       try {
+        // Fetch all guild roles to populate the cache
+        await guild.roles.fetch();
+
         const member = await guild.members.fetch(interaction.user.id);
         const roleAssignments = await getRoleAssignments(interaction.user.id);
 
@@ -216,6 +219,9 @@ export async function handleSelectMenu(
     const guild = interaction.guild;
     if (guild) {
       try {
+        // Fetch all guild roles to populate the cache
+        await guild.roles.fetch();
+
         const member = await guild.members.fetch(interaction.user.id);
         const walletAddresses = remainingWallets.map(w => w.walletAddress);
         const results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
@@ -256,6 +262,9 @@ export async function handleSelectMenu(
     const guild = interaction.guild;
     if (guild) {
       try {
+        // Fetch all guild roles to populate the cache
+        await guild.roles.fetch();
+
         const member = await guild.members.fetch(interaction.user.id);
         const roleAssignments = await getRoleAssignments(interaction.user.id);
 

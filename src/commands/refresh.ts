@@ -50,6 +50,10 @@ export async function execute(
     return;
   }
 
+  // Fetch all guild roles to populate the cache
+  // This ensures guild.roles.cache.get() works correctly
+  await guild.roles.fetch();
+
   const member = await guild.members.fetch(interaction.user.id);
   const previousRoles = await getRoleAssignments(interaction.user.id);
   const addedRoles: string[] = [];

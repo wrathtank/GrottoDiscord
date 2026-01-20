@@ -272,6 +272,9 @@ export async function handleModal(
     return;
   }
 
+  // Fetch all guild roles to populate the cache
+  await guild.roles.fetch();
+
   const member = await guild.members.fetch(interaction.user.id);
   const assignedRoles: string[] = [];
   const embeds: EmbedBuilder[] = [];

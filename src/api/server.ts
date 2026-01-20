@@ -179,6 +179,9 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
+      // Fetch all guild roles to populate the cache
+      await guild.roles.fetch();
+
       const member = await guild.members.fetch(session.discordId).catch(() => null);
       if (!member) {
         return res.json({
