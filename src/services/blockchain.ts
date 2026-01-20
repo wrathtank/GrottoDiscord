@@ -466,6 +466,77 @@ export class BlockchainService {
     return results;
   }
 
+  // Verify roles across multiple wallets, summing balances
+  async verifyAllRolesMultiWallet(
+    roles: RoleConfig[],
+    walletAddresses: string[]
+  ): Promise<VerificationResult[]> {
+    if (walletAddresses.length === 0) {
+      return [];
+    }
+
+    // If only one wallet, use the regular method
+    if (walletAddresses.length === 1) {
+      return this.verifyAllRoles(roles, walletAddresses[0]);
+    }
+
+    // For multiple wallets, we need to check each requirement across all wallets
+    // and sum the balances
+    const results: VerificationResult[] = [];
+
+    for (const role of roles) {
+      const requirementResults: RequirementResult[] = [];
+      let hasError = false;
+
+      for (const requirement of role.requirements) {
+        let totalBalance = 0n;
+        let anyError = false;
+
+        // Sum balances across all wallets
+        for (const wallet of walletAddresses) {
+          try {
+            const result = await this.checkRequirement(requirement, wallet);
+            totalBalance += BigInt(result.actual);
+            if (result.error) anyError = true;
+          } catch {
+            anyError = true;
+          }
+        }
+
+        const minRequired = BigInt(requirement.minBalance);
+        const passed = totalBalance >= minRequired;
+
+        requirementResults.push({
+          type: requirement.type,
+          contractAddress: requirement.contractAddress,
+          required: requirement.minBalance,
+          actual: totalBalance.toString(),
+          passed,
+          error: anyError,
+        });
+
+        if (anyError) hasError = true;
+      }
+
+      let qualified: boolean;
+      if (role.requireAll) {
+        qualified = requirementResults.every((r) => r.passed);
+      } else {
+        qualified = requirementResults.some((r) => r.passed);
+      }
+
+      results.push({
+        roleId: role.id,
+        roleName: role.name,
+        qualified,
+        details: requirementResults,
+        error: hasError,
+      });
+    }
+
+    return results;
+  }
+
   verifySignature(message: string, signature: string, expectedAddress: string): boolean {
     try {
       const recoveredAddress = ethers.verifyMessage(message, signature);

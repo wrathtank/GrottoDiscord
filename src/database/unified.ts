@@ -22,11 +22,26 @@ export async function getLinkedWallet(discordId: string): Promise<LinkedWallet |
   return sqlite.getLinkedWallet(discordId);
 }
 
+// Get ALL wallets for a user
+export async function getLinkedWallets(discordId: string): Promise<LinkedWallet[]> {
+  if (useSupabase) {
+    return supabase.getLinkedWallets(discordId);
+  }
+  return sqlite.getLinkedWallets(discordId);
+}
+
 export async function getWalletByAddress(address: string): Promise<LinkedWallet | null> {
   if (useSupabase) {
     return supabase.getWalletByAddress(address);
   }
   return sqlite.getWalletByAddress(address);
+}
+
+export async function getWalletCount(discordId: string): Promise<number> {
+  if (useSupabase) {
+    return supabase.getWalletCount(discordId);
+  }
+  return sqlite.getWalletCount(discordId);
 }
 
 export async function linkWallet(
@@ -42,11 +57,11 @@ export async function linkWallet(
   }
 }
 
-export async function unlinkWallet(discordId: string): Promise<boolean> {
+export async function unlinkWallet(discordId: string, walletAddress?: string): Promise<boolean> {
   if (useSupabase) {
-    return supabase.unlinkWallet(discordId);
+    return supabase.unlinkWallet(discordId, walletAddress);
   }
-  return sqlite.unlinkWallet(discordId);
+  return sqlite.unlinkWallet(discordId, walletAddress);
 }
 
 export async function updateLastVerified(discordId: string): Promise<void> {

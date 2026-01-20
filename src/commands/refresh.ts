@@ -6,7 +6,7 @@ import {
 import { BlockchainService } from '../services/blockchain';
 import { BotConfig } from '../types';
 import {
-  getLinkedWallet,
+  getLinkedWallets,
   updateLastVerified,
   recordRoleAssignment,
   removeRoleAssignment,
@@ -22,9 +22,9 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const wallet = await getLinkedWallet(interaction.user.id);
+  const wallets = await getLinkedWallets(interaction.user.id);
 
-  if (!wallet) {
+  if (wallets.length === 0) {
     const embed = new EmbedBuilder()
       .setTitle('No Wallet Linked')
       .setDescription(config.messages.notLinked)
@@ -36,7 +36,9 @@ export async function execute(
 
   await interaction.deferReply({ ephemeral: true });
 
-  const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+  // Get all wallet addresses and verify with multi-wallet support
+  const walletAddresses = wallets.map(w => w.walletAddress);
+  const results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
 
   // Try interaction.guild first, then fetch as fallback
   let guild = interaction.guild;
@@ -134,9 +136,14 @@ export async function execute(
 
   await updateLastVerified(interaction.user.id);
 
+  // Build wallet description
+  const walletDesc = wallets.length === 1
+    ? `Wallet: \`${wallets[0].walletAddress.slice(0, 6)}...${wallets[0].walletAddress.slice(-4)}\``
+    : `Wallets (${wallets.length}): ${wallets.map(w => `\`${w.walletAddress.slice(0, 6)}...${w.walletAddress.slice(-4)}\``).join(', ')}`;
+
   const summaryEmbed = new EmbedBuilder()
     .setTitle('🔄 Roles Refreshed')
-    .setDescription(`Wallet: \`${wallet.walletAddress.slice(0, 6)}...${wallet.walletAddress.slice(-4)}\``)
+    .setDescription(walletDesc)
     .setColor(0x5865f2)
     .setTimestamp();
 

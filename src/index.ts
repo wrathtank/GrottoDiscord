@@ -156,30 +156,39 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
       return;
     }
 
+    // Group wallets by Discord user for multi-wallet verification
+    const walletsByUser = new Map<string, string[]>();
+    for (const wallet of allWallets) {
+      const existing = walletsByUser.get(wallet.discordId) || [];
+      existing.push(wallet.walletAddress);
+      walletsByUser.set(wallet.discordId, existing);
+    }
+
     let processed = 0;
     let errors = 0;
     let rolesAdded = 0;
     let rolesRemoved = 0;
     let skippedDueToError = 0;
 
-    for (const wallet of allWallets) {
+    for (const [discordId, walletAddresses] of walletsByUser) {
       try {
-        // Add a small delay between wallets to avoid rate limiting
+        // Add a small delay between users to avoid rate limiting
         if (processed > 0) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        let results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+        // Verify all wallets for this user together (balances are summed)
+        let results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
 
         // Retry once if there were errors
         const hasErrors = results.some(r => r.error);
         if (hasErrors) {
-          console.log(`[Scheduler] Retrying verification for ${wallet.walletAddress.slice(0, 8)}... due to errors`);
+          console.log(`[Scheduler] Retrying verification for user ${discordId.slice(0, 8)}... due to errors`);
           await new Promise(resolve => setTimeout(resolve, 2000));
-          results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+          results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
         }
 
-        const member = await guild.members.fetch(wallet.discordId).catch(() => null);
+        const member = await guild.members.fetch(discordId).catch(() => null);
 
         if (member) {
           // First pass: collect all Discord role IDs that the user qualifies for
@@ -210,11 +219,11 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
               // IMPORTANT: Don't remove role if there was an error checking
               // Only remove if we successfully verified they don't qualify
               if (result.error) {
-                console.log(`[Scheduler] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - verification error`);
+                console.log(`[Scheduler] Skipping role removal for user ${discordId.slice(0, 8)}... - verification error`);
                 skippedDueToError++;
               } else if (qualifiedDiscordRoleIds.has(roleConfig.discordRoleId)) {
                 // Don't remove if another config entry qualified for same Discord role
-                console.log(`[Scheduler] Skipping role removal for ${wallet.walletAddress.slice(0, 8)}... - qualified via another config`);
+                console.log(`[Scheduler] Skipping role removal for user ${discordId.slice(0, 8)}... - qualified via another config`);
               } else {
                 await member.roles.remove(discordRole);
                 rolesRemoved++;
@@ -225,11 +234,11 @@ async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<voi
         processed++;
       } catch (error) {
         errors++;
-        console.error(`[Scheduler] Error processing wallet ${wallet.walletAddress.slice(0, 8)}...:`, error);
+        console.error(`[Scheduler] Error processing user ${discordId.slice(0, 8)}...:`, error);
       }
     }
 
-    console.log(`[Scheduler] Refresh complete: ${processed} wallets, +${rolesAdded} roles, -${rolesRemoved} roles, ${skippedDueToError} skipped (errors), ${errors} failures`);
+    console.log(`[Scheduler] Refresh complete: ${processed} users (${allWallets.length} wallets), +${rolesAdded} roles, -${rolesRemoved} roles, ${skippedDueToError} skipped (errors), ${errors} failures`);
   } catch (error) {
     console.error('[Scheduler] Error during scheduled refresh:', error);
   }

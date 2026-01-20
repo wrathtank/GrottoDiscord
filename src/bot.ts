@@ -8,6 +8,7 @@ import {
   ChatInputCommandInteraction,
   ButtonInteraction,
   ModalSubmitInteraction,
+  StringSelectMenuInteraction,
 } from 'discord.js';
 import { BlockchainService } from './services/blockchain';
 import { BotConfig } from './types';
@@ -79,6 +80,8 @@ export class GrottoBot {
       await this.handleButton(interaction);
     } else if (interaction.isModalSubmit()) {
       await this.handleModal(interaction);
+    } else if (interaction.isStringSelectMenu()) {
+      await this.handleSelectMenu(interaction);
     }
   }
 
@@ -113,6 +116,14 @@ export class GrottoBot {
 
     if (customId.startsWith('verify_modal_')) {
       await commands.verify.handleModal(interaction, this.blockchain, this.config);
+    }
+  }
+
+  private async handleSelectMenu(interaction: StringSelectMenuInteraction): Promise<void> {
+    const customId = interaction.customId;
+
+    if (customId.startsWith('unlink_select_')) {
+      await commands.unlink.handleSelectMenu(interaction, this.blockchain, this.config);
     }
   }
 

@@ -16,6 +16,8 @@ import { BlockchainService } from '../services/blockchain';
 import { BotConfig } from '../types';
 import {
   getLinkedWallet,
+  getLinkedWallets,
+  getWalletCount,
   linkWallet,
   createVerificationSession,
   getVerificationSession,
@@ -26,6 +28,8 @@ import {
   getWalletByAddress,
 } from '../database/unified';
 
+const MAX_WALLETS_PER_USER = 5; // Limit wallets per user
+
 export const data = new SlashCommandBuilder()
   .setName('verify')
   .setDescription('Link and verify your wallet to get roles based on your holdings');
@@ -35,13 +39,17 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const existingWallet = await getLinkedWallet(interaction.user.id);
+  const walletCount = await getWalletCount(interaction.user.id);
 
-  if (existingWallet) {
+  // Check if user has reached the wallet limit
+  if (walletCount >= MAX_WALLETS_PER_USER) {
+    const wallets = await getLinkedWallets(interaction.user.id);
+    const walletList = wallets.map((w, i) => `${i + 1}. \`${w.walletAddress.slice(0, 6)}...${w.walletAddress.slice(-4)}\``).join('\n');
+
     const embed = new EmbedBuilder()
-      .setTitle('Wallet Already Linked')
+      .setTitle('Wallet Limit Reached')
       .setDescription(
-        `You already have a wallet linked: \`${existingWallet.walletAddress.slice(0, 6)}...${existingWallet.walletAddress.slice(-4)}\`\n\nUse \`/refresh\` to update your roles or \`/unlink\` to remove it.`
+        `You have ${walletCount}/${MAX_WALLETS_PER_USER} wallets linked:\n\n${walletList}\n\nUse \`/unlink\` to remove a wallet before adding a new one.`
       )
       .setColor(0xffa500);
 
@@ -250,7 +258,12 @@ export async function handleModal(
   await linkWallet(interaction.user.id, walletAddress, signature, session.nonce);
   await deleteVerificationSession(sessionId);
 
-  const results = await blockchain.verifyAllRoles(config.roles, walletAddress);
+  // Get all wallets for multi-wallet verification
+  const allWallets = await getLinkedWallets(interaction.user.id);
+  const walletAddresses = allWallets.map(w => w.walletAddress);
+
+  // Verify using all linked wallets (balances are summed)
+  const results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
   const qualifiedRoles = results.filter((r) => r.qualified);
 
   const guild = interaction.guild;

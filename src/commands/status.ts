@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { BlockchainService } from '../services/blockchain';
 import { BotConfig } from '../types';
-import { getLinkedWallet, getRoleAssignments } from '../database/unified';
+import { getLinkedWallets, getRoleAssignments } from '../database/unified';
 
 export const data = new SlashCommandBuilder()
   .setName('status')
@@ -16,9 +16,9 @@ export async function execute(
   blockchain: BlockchainService,
   config: BotConfig
 ) {
-  const wallet = await getLinkedWallet(interaction.user.id);
+  const wallets = await getLinkedWallets(interaction.user.id);
 
-  if (!wallet) {
+  if (wallets.length === 0) {
     const embed = new EmbedBuilder()
       .setTitle('No Wallet Linked')
       .setDescription(config.messages.notLinked)
@@ -30,15 +30,25 @@ export async function execute(
 
   await interaction.deferReply({ ephemeral: true });
 
-  const results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+  const walletAddresses = wallets.map(w => w.walletAddress);
+  const results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
   const currentRoles = await getRoleAssignments(interaction.user.id);
+
+  // Build wallet list for display
+  const walletList = wallets.map((w, i) =>
+    `${i + 1}. \`${w.walletAddress.slice(0, 6)}...${w.walletAddress.slice(-4)}\``
+  ).join('\n');
 
   const embed = new EmbedBuilder()
     .setTitle('📊 Wallet Status')
-    .setDescription(`**Wallet:** \`${wallet.walletAddress}\``)
+    .setDescription(
+      wallets.length === 1
+        ? `**Wallet:** \`${wallets[0].walletAddress}\``
+        : `**Linked Wallets (${wallets.length}):**\n${walletList}\n\n*Balances are combined across all wallets*`
+    )
     .setColor(0x5865f2)
     .setTimestamp()
-    .setFooter({ text: `Last verified: ${new Date(wallet.lastVerified).toLocaleString()}` });
+    .setFooter({ text: `Last verified: ${new Date(wallets[0].lastVerified).toLocaleString()}` });
 
   for (const result of results) {
     const roleConfig = config.roles.find((r) => r.id === result.roleId);
