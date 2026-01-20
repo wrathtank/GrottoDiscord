@@ -147,10 +147,17 @@ export class BlockchainService {
 
     // Check if this token has cross-chain equivalents
     const crossChainTokens = ERC20_CROSS_CHAIN_MAP[normalizedContract];
+    console.log(`[Blockchain] Cross-chain lookup for ${normalizedContract}: found ${crossChainTokens ? crossChainTokens.length : 0} equivalents. Configured chains: ${Array.from(this.chains.keys()).join(', ')}`);
+
     if (crossChainTokens && crossChainTokens.length > 0) {
       for (const equivalent of crossChainTokens) {
+        console.log(`[Blockchain] Checking cross-chain: chainId=${equivalent.chainId}, native=${equivalent.native}, staked=${equivalent.staked}, contract=${equivalent.contractAddress || 'N/A'}`);
+
         // Skip if the equivalent is on the same chain we already checked
-        if (equivalent.chainId === (chainId || this.defaultChain)) continue;
+        if (equivalent.chainId === (chainId || this.defaultChain)) {
+          console.log(`[Blockchain] Skipping ${equivalent.chainId} - same as primary chain`);
+          continue;
+        }
 
         // Check if we have this chain configured
         if (!this.chains.has(equivalent.chainId)) {
