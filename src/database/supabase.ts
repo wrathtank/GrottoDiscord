@@ -24,11 +24,14 @@ export async function initSupabase(): Promise<void> {
   console.log('[Supabase] Connected successfully');
 }
 
+// Get most recent wallet for a user (backwards compatibility)
 export async function getLinkedWallet(discordId: string): Promise<LinkedWallet | null> {
   const { data, error } = await supabase
     .from('linked_wallets')
     .select('*')
     .eq('discord_id', discordId)
+    .order('linked_at', { ascending: false })
+    .limit(1)
     .single();
 
   if (error || !data) return null;
@@ -42,6 +45,27 @@ export async function getLinkedWallet(discordId: string): Promise<LinkedWallet |
     signature: data.signature,
     nonce: data.nonce,
   };
+}
+
+// Get ALL wallets for a user
+export async function getLinkedWallets(discordId: string): Promise<LinkedWallet[]> {
+  const { data, error } = await supabase
+    .from('linked_wallets')
+    .select('*')
+    .eq('discord_id', discordId)
+    .order('linked_at', { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id,
+    discordId: row.discord_id,
+    walletAddress: row.wallet_address,
+    linkedAt: new Date(row.linked_at).getTime(),
+    lastVerified: new Date(row.last_verified).getTime(),
+    signature: row.signature,
+    nonce: row.nonce,
+  }));
 }
 
 export async function getWalletByAddress(address: string): Promise<LinkedWallet | null> {
@@ -71,38 +95,87 @@ export async function linkWallet(
   nonce?: string
 ): Promise<void> {
   const now = new Date().toISOString();
+  const normalizedAddress = walletAddress.toLowerCase();
 
-  const { error } = await supabase
-    .from('linked_wallets')
-    .upsert({
-      discord_id: discordId,
-      wallet_address: walletAddress.toLowerCase(),
-      linked_at: now,
-      last_verified: now,
-      signature: signature || null,
-      nonce: nonce || null,
-    }, {
-      onConflict: 'discord_id',
-    });
+  // Check if this wallet is already linked
+  const existingWallet = await getWalletByAddress(normalizedAddress);
 
-  if (error) {
-    console.error('[Supabase] Error linking wallet:', error);
-    throw error;
+  if (existingWallet) {
+    // Update existing wallet link (same user re-verifying)
+    const { error } = await supabase
+      .from('linked_wallets')
+      .update({
+        last_verified: now,
+        signature: signature || null,
+        nonce: nonce || null,
+      })
+      .ilike('wallet_address', normalizedAddress);
+
+    if (error) {
+      console.error('[Supabase] Error updating wallet:', error);
+      throw error;
+    }
+  } else {
+    // Add new wallet for user (upsert on wallet_address, not discord_id)
+    const { error } = await supabase
+      .from('linked_wallets')
+      .insert({
+        discord_id: discordId,
+        wallet_address: normalizedAddress,
+        linked_at: now,
+        last_verified: now,
+        signature: signature || null,
+        nonce: nonce || null,
+      });
+
+    if (error) {
+      console.error('[Supabase] Error linking wallet:', error);
+      throw error;
+    }
   }
 }
 
-export async function unlinkWallet(discordId: string): Promise<boolean> {
-  const { error, count } = await supabase
+// Unlink a specific wallet or all wallets for a user
+export async function unlinkWallet(discordId: string, walletAddress?: string): Promise<boolean> {
+  if (walletAddress) {
+    // Unlink specific wallet
+    const existing = await getWalletByAddress(walletAddress);
+    if (!existing || existing.discordId !== discordId) return false;
+
+    const { error } = await supabase
+      .from('linked_wallets')
+      .delete()
+      .ilike('wallet_address', walletAddress);
+
+    if (error) {
+      console.error('[Supabase] Error unlinking wallet:', error);
+      return false;
+    }
+    return true;
+  } else {
+    // Unlink all wallets
+    const { error, count } = await supabase
+      .from('linked_wallets')
+      .delete()
+      .eq('discord_id', discordId);
+
+    if (error) {
+      console.error('[Supabase] Error unlinking wallets:', error);
+      return false;
+    }
+    return (count || 0) > 0;
+  }
+}
+
+// Count wallets for a user
+export async function getWalletCount(discordId: string): Promise<number> {
+  const { count, error } = await supabase
     .from('linked_wallets')
-    .delete()
+    .select('*', { count: 'exact', head: true })
     .eq('discord_id', discordId);
 
-  if (error) {
-    console.error('[Supabase] Error unlinking wallet:', error);
-    return false;
-  }
-
-  return (count || 0) > 0;
+  if (error) return 0;
+  return count || 0;
 }
 
 export async function updateLastVerified(discordId: string): Promise<void> {

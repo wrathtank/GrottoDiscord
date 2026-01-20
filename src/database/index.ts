@@ -59,18 +59,23 @@ export async function initDatabase(): Promise<void> {
     db = new SQL.Database();
   }
 
-  // Create tables
+  // Create tables - supports multiple wallets per user
+  // wallet_address is unique (one wallet = one user), discord_id is not (one user = many wallets)
   db.run(`
     CREATE TABLE IF NOT EXISTS linked_wallets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      discord_id TEXT UNIQUE NOT NULL,
-      wallet_address TEXT NOT NULL,
+      discord_id TEXT NOT NULL,
+      wallet_address TEXT UNIQUE NOT NULL,
       linked_at INTEGER NOT NULL,
       last_verified INTEGER NOT NULL,
       signature TEXT,
       nonce TEXT
     )
   `);
+
+  // Migration: remove old unique constraint on discord_id if it exists
+  // SQLite doesn't support dropping constraints, so we just continue
+  // The new UNIQUE on wallet_address will be enforced on new inserts
 
   db.run(`
     CREATE TABLE IF NOT EXISTS verification_sessions (
@@ -120,12 +125,14 @@ export async function initDatabase(): Promise<void> {
   console.log('[Database] Initialized successfully');
 }
 
+// Get most recent wallet for a user (backwards compatibility)
 export function getLinkedWallet(discordId: string): LinkedWallet | null {
   const stmt = db.prepare(`
     SELECT id, discord_id as discordId, wallet_address as walletAddress,
            linked_at as linkedAt, last_verified as lastVerified,
            signature, nonce
     FROM linked_wallets WHERE discord_id = ?
+    ORDER BY linked_at DESC LIMIT 1
   `);
   stmt.bind([discordId]);
 
@@ -136,6 +143,25 @@ export function getLinkedWallet(discordId: string): LinkedWallet | null {
   }
   stmt.free();
   return null;
+}
+
+// Get ALL wallets for a user
+export function getLinkedWallets(discordId: string): LinkedWallet[] {
+  const stmt = db.prepare(`
+    SELECT id, discord_id as discordId, wallet_address as walletAddress,
+           linked_at as linkedAt, last_verified as lastVerified,
+           signature, nonce
+    FROM linked_wallets WHERE discord_id = ?
+    ORDER BY linked_at ASC
+  `);
+  stmt.bind([discordId]);
+
+  const wallets: LinkedWallet[] = [];
+  while (stmt.step()) {
+    wallets.push(stmt.getAsObject() as unknown as LinkedWallet);
+  }
+  stmt.free();
+  return wallets;
 }
 
 export function getWalletByAddress(address: string): LinkedWallet | null {
@@ -163,31 +189,54 @@ export function linkWallet(
   nonce?: string
 ): void {
   const now = Date.now();
+  const normalizedAddress = walletAddress.toLowerCase();
 
-  // Check if exists
-  const existing = getLinkedWallet(discordId);
+  // Check if this specific wallet is already linked
+  const existingWallet = getWalletByAddress(normalizedAddress);
 
-  if (existing) {
+  if (existingWallet) {
+    // Update existing wallet link (same user re-verifying)
     db.run(
-      `UPDATE linked_wallets SET wallet_address = ?, last_verified = ?, signature = ?, nonce = ? WHERE discord_id = ?`,
-      [walletAddress.toLowerCase(), now, signature || null, nonce || null, discordId]
+      `UPDATE linked_wallets SET last_verified = ?, signature = ?, nonce = ? WHERE LOWER(wallet_address) = ?`,
+      [now, signature || null, nonce || null, normalizedAddress]
     );
   } else {
+    // Add new wallet for user
     db.run(
       `INSERT INTO linked_wallets (discord_id, wallet_address, linked_at, last_verified, signature, nonce) VALUES (?, ?, ?, ?, ?, ?)`,
-      [discordId, walletAddress.toLowerCase(), now, now, signature || null, nonce || null]
+      [discordId, normalizedAddress, now, now, signature || null, nonce || null]
     );
   }
   markChanged();
 }
 
-export function unlinkWallet(discordId: string): boolean {
-  const existing = getLinkedWallet(discordId);
-  if (!existing) return false;
+// Unlink a specific wallet or all wallets for a user
+export function unlinkWallet(discordId: string, walletAddress?: string): boolean {
+  if (walletAddress) {
+    // Unlink specific wallet
+    const existing = getWalletByAddress(walletAddress);
+    if (!existing || existing.discordId !== discordId) return false;
 
-  db.run('DELETE FROM linked_wallets WHERE discord_id = ?', [discordId]);
+    db.run('DELETE FROM linked_wallets WHERE LOWER(wallet_address) = LOWER(?)', [walletAddress]);
+  } else {
+    // Unlink all wallets
+    const existing = getLinkedWallet(discordId);
+    if (!existing) return false;
+
+    db.run('DELETE FROM linked_wallets WHERE discord_id = ?', [discordId]);
+  }
   markChanged();
   return true;
+}
+
+// Count wallets for a user
+export function getWalletCount(discordId: string): number {
+  const stmt = db.prepare('SELECT COUNT(*) as count FROM linked_wallets WHERE discord_id = ?');
+  stmt.bind([discordId]);
+  stmt.step();
+  const count = (stmt.getAsObject() as { count: number }).count;
+  stmt.free();
+  return count;
 }
 
 export function updateLastVerified(discordId: string): void {
