@@ -42,23 +42,26 @@ const NFT_STAKING_MAP: Record<string, { stakingContract: string; method: string 
 // Mapping of ERC20 tokens to their equivalent tokens on other chains
 // When checking balance, also check equivalent tokens and combine them
 // Key: contractAddress (lowercase), Value: array of equivalent contracts on other chains
-// If native: true, use provider.getBalance() instead of ERC20 contract call
+// Options: native (gas token), staked (staking contract with stakers method)
 interface CrossChainToken {
   contractAddress?: string;  // Optional if native is true
   chainId: string;
   native?: boolean;  // If true, check native gas token balance via getBalance()
+  staked?: boolean;  // If true, contractAddress is a staking contract, use stakers() method
 }
 
 const ERC20_CROSS_CHAIN_MAP: Record<string, CrossChainToken[]> = {
-  // HERESY on AVAX -> also check Wrapped HERESY and Native HERESY on Grotto L1
+  // HERESY on AVAX -> also check Wrapped HERESY, Native HERESY, and Staked HERESY on Grotto L1
   '0x432d38f83a50ec77c409d086e97448794cf76dcf': [
-    { contractAddress: '0xbA90A70ba89Ea3A2b2e9B9ebcD16239aAA531042', chainId: 'grotto' },
+    { contractAddress: '0xbA90A70ba89Ea3A2b2e9B9ebcD16239aAA531042', chainId: 'grotto' },  // Wrapped HERESY
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
+    { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
-  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX and native on Grotto
+  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX, native + staked on Grotto
   '0xba90a70ba89ea3a2b2e9b9ebcd16239aaa531042': [
-    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },
+    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },  // Native HERESY on AVAX
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
+    { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
 };
 
@@ -166,6 +169,17 @@ export class BlockchainService {
               return balance;
             });
             console.log(`[Blockchain] Adding native balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
+          } else if (equivalent.staked && equivalent.contractAddress) {
+            // Check staked balance via stakers() method
+            const STAKING_ABI = ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'];
+            crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
+              const contract = new Contract(equivalent.contractAddress!, STAKING_ABI, provider);
+              const result = await contract.stakers(walletAddress);
+              const amountStaked = result[0];
+              console.log(`[Blockchain] Staked balance for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId} (${equivalent.contractAddress!.slice(0, 10)}...): ${amountStaked.toString()}`);
+              return amountStaked;
+            });
+            console.log(`[Blockchain] Adding staked balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
           } else if (equivalent.contractAddress) {
             // Check ERC20 contract balance
             crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
