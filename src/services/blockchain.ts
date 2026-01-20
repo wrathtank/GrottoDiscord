@@ -170,14 +170,37 @@ export class BlockchainService {
             });
             console.log(`[Blockchain] Adding native balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
           } else if (equivalent.staked && equivalent.contractAddress) {
-            // Check staked balance via stakers() method
-            const STAKING_ABI = ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'];
+            // Check staked balance - try multiple common staking contract methods
             crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
-              const contract = new Contract(equivalent.contractAddress!, STAKING_ABI, provider);
-              const result = await contract.stakers(walletAddress);
-              const amountStaked = result[0];
-              console.log(`[Blockchain] Staked balance for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId} (${equivalent.contractAddress!.slice(0, 10)}...): ${amountStaked.toString()}`);
-              return amountStaked;
+              const contractAddr = equivalent.contractAddress!;
+
+              // Try different staking ABIs in order of likelihood
+              const stakingMethods = [
+                // Thirdweb staking - stakers() returns tuple
+                { abi: ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'], method: 'stakers', tupleIndex: 0 },
+                // Thirdweb ERC20 staking - getStakeInfo returns tuple
+                { abi: ['function getStakeInfo(address staker) view returns (uint256 tokensStaked, uint256 rewards)'], method: 'getStakeInfo', tupleIndex: 0 },
+                // Simple stakedBalance
+                { abi: ['function stakedBalance(address account) view returns (uint256)'], method: 'stakedBalance', tupleIndex: null },
+                // balanceOf (some staking contracts use this)
+                { abi: ['function balanceOf(address account) view returns (uint256)'], method: 'balanceOf', tupleIndex: null },
+              ];
+
+              for (const { abi, method, tupleIndex } of stakingMethods) {
+                try {
+                  const contract = new Contract(contractAddr, abi, provider);
+                  const result = await contract[method](walletAddress);
+                  const balance = tupleIndex !== null ? BigInt(result[tupleIndex]) : BigInt(result);
+                  console.log(`[Blockchain] Staked balance via ${method}() for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId}: ${balance.toString()}`);
+                  return balance;
+                } catch (methodError) {
+                  console.log(`[Blockchain] Method ${method}() failed on ${contractAddr.slice(0, 10)}..., trying next...`);
+                  continue;
+                }
+              }
+
+              console.warn(`[Blockchain] All staking methods failed for ${contractAddr}`);
+              return 0n;
             });
             console.log(`[Blockchain] Adding staked balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
           } else if (equivalent.contractAddress) {
