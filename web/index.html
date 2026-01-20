@@ -115,10 +115,21 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
   <script type="module">
-    // Load WalletConnect as ES module and expose globally
-    import EthereumProvider from 'https://esm.sh/@walletconnect/ethereum-provider@2.11.2';
-    window.WalletConnectProvider = EthereumProvider;
-    window.dispatchEvent(new Event('walletconnect-loaded'));
+    // Load WalletConnect using dynamic import with error handling
+    async function loadWalletConnect() {
+      try {
+        // Try loading from esm.sh
+        const { EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2.13.0?bundle');
+        window.WalletConnectProvider = EthereumProvider;
+        console.log('WalletConnect loaded successfully');
+        window.dispatchEvent(new Event('walletconnect-loaded'));
+      } catch (err) {
+        console.error('Failed to load WalletConnect:', err);
+        window.WalletConnectLoadError = err;
+        window.dispatchEvent(new Event('walletconnect-error'));
+      }
+    }
+    loadWalletConnect();
   </script>
   <script src="app.js"></script>
 </body>
