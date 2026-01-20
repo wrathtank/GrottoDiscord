@@ -478,6 +478,13 @@ async function handleRefreshLog(
   logLines.push(`=== REFRESH LOG ${new Date().toISOString()} ===`);
   logLines.push(`Total wallets: ${allWallets.length}`);
   logLines.push(`Configured roles: ${config.roles.map(r => r.name).join(', ')}`);
+
+  // Debug: Log role cache status
+  logLines.push(`Guild roles in cache: ${guild.roles.cache.size}`);
+  for (const roleConfig of config.roles) {
+    const cachedRole = guild.roles.cache.get(roleConfig.discordRoleId);
+    logLines.push(`  ${roleConfig.name} (${roleConfig.discordRoleId}): ${cachedRole ? `Found - "${cachedRole.name}"` : 'NOT FOUND'}`);
+  }
   logLines.push('');
 
   let processed = 0;
@@ -554,6 +561,8 @@ async function handleRefreshLog(
           } else {
             logLines.push(`    ACTION: No change needed`);
           }
+        } else {
+          logLines.push(`    ACTION: ⚠️ Skipped - ${!member ? 'member not found' : 'role not in guild cache'}`);
         }
       }
 
