@@ -484,13 +484,35 @@ async function connectWithWalletConnect() {
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Initializing...</span>';
-    console.log('Initializing WalletConnect provider...');
+    console.log('Initializing WalletConnect provider, isMobile:', isMobile);
 
+    // Always show QR modal - it handles mobile deep linking automatically
     walletConnectProvider = await EthereumProvider.init({
       projectId: WALLETCONNECT_PROJECT_ID,
       chains: [43114], // Avalanche C-Chain
-      optionalChains: [1, 43114], // Ethereum mainnet and Avalanche
-      showQrModal: !isMobile, // Don't show modal on mobile - we'll deep link instead
+      optionalChains: [1, 43114],
+      showQrModal: true,
+      qrModalOptions: {
+        themeMode: 'dark',
+        themeVariables: {
+          '--wcm-z-index': '99999'
+        },
+        // Prioritize Core wallet for mobile
+        desktopWallets: [],
+        mobileWallets: [
+          {
+            id: 'core',
+            name: 'Core',
+            links: {
+              native: 'core://',
+              universal: 'https://core.app'
+            }
+          }
+        ],
+        walletImages: {
+          core: 'https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png'
+        }
+      },
       metadata: {
         name: 'The Grotto',
         description: 'Wallet Verification for The Grotto Discord',
@@ -500,32 +522,17 @@ async function connectWithWalletConnect() {
     });
 
     console.log('WalletConnect provider initialized');
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Select wallet...</span>';
 
-    // On mobile, we need to handle the connection differently
-    if (isMobile) {
-      btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Opening wallet...</span>';
-
-      // Listen for the display_uri event to get the WalletConnect URI
-      walletConnectProvider.on('display_uri', (uri) => {
-        console.log('Got WalletConnect URI:', uri);
-        // Create deep link for Core wallet
-        // Core wallet uses: https://core.app/wc?uri=<encoded_uri>
-        const encodedUri = encodeURIComponent(uri);
-        const coreDeepLink = `https://core.app/wc?uri=${encodedUri}`;
-        console.log('Opening Core deep link:', coreDeepLink);
-        window.location.href = coreDeepLink;
-      });
-    }
-
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Connecting...</span>';
-
-    // Connect and get accounts with timeout
+    // Connect - this should open the modal
     const connectPromise = walletConnectProvider.connect();
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 120000)
     );
 
     await Promise.race([connectPromise, timeoutPromise]);
+
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Getting accounts...</span>';
 
     // Get accounts after connection
     const accounts = await walletConnectProvider.enable();
