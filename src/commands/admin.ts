@@ -483,8 +483,16 @@ async function handleRefreshLog(
   logLines.push(`Guild roles in cache: ${guild.roles.cache.size}`);
   for (const roleConfig of config.roles) {
     const cachedRole = guild.roles.cache.get(roleConfig.discordRoleId);
-    logLines.push(`  ${roleConfig.name} (${roleConfig.discordRoleId}): ${cachedRole ? `Found - "${cachedRole.name}"` : 'NOT FOUND'}`);
+    logLines.push(`  Config: ${roleConfig.name} (${roleConfig.discordRoleId}): ${cachedRole ? `Found - "${cachedRole.name}"` : 'NOT FOUND'}`);
   }
+  logLines.push('');
+  logLines.push('All guild roles (use these IDs in config):');
+  guild.roles.cache
+    .filter(role => role.name !== '@everyone')
+    .sort((a, b) => b.position - a.position)
+    .forEach((role) => {
+      logLines.push(`  "${role.name}" => ${role.id}`);
+    });
   logLines.push('');
 
   let processed = 0;
