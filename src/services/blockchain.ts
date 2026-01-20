@@ -42,14 +42,23 @@ const NFT_STAKING_MAP: Record<string, { stakingContract: string; method: string 
 // Mapping of ERC20 tokens to their equivalent tokens on other chains
 // When checking balance, also check equivalent tokens and combine them
 // Key: contractAddress (lowercase), Value: array of equivalent contracts on other chains
-const ERC20_CROSS_CHAIN_MAP: Record<string, Array<{ contractAddress: string; chainId: string }>> = {
-  // Native HERESY on AVAX -> also check Wrapped HERESY on Grotto L1
+// If native: true, use provider.getBalance() instead of ERC20 contract call
+interface CrossChainToken {
+  contractAddress?: string;  // Optional if native is true
+  chainId: string;
+  native?: boolean;  // If true, check native gas token balance via getBalance()
+}
+
+const ERC20_CROSS_CHAIN_MAP: Record<string, CrossChainToken[]> = {
+  // HERESY on AVAX -> also check Wrapped HERESY and Native HERESY on Grotto L1
   '0x432d38f83a50ec77c409d086e97448794cf76dcf': [
     { contractAddress: '0xbA90A70ba89Ea3A2b2e9B9ebcD16239aAA531042', chainId: 'grotto' },
+    { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
   ],
-  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX
+  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX and native on Grotto
   '0xba90a70ba89ea3a2b2e9b9ebcd16239aaa531042': [
     { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },
+    { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
   ],
 };
 
@@ -147,14 +156,29 @@ export class BlockchainService {
         }
 
         try {
-          const crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
-            const contract = new Contract(equivalent.contractAddress, ERC20_ABI, provider);
-            const balance = await contract.balanceOf(walletAddress);
-            console.log(`[Blockchain] ERC20 cross-chain balanceOf ${equivalent.contractAddress.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId}: ${balance.toString()}`);
-            return balance;
-          });
+          let crossChainBalance: bigint;
 
-          console.log(`[Blockchain] Adding cross-chain balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
+          if (equivalent.native) {
+            // Check native gas token balance
+            crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
+              const balance = await provider.getBalance(walletAddress);
+              console.log(`[Blockchain] Native balance for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId}: ${balance.toString()}`);
+              return balance;
+            });
+            console.log(`[Blockchain] Adding native balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
+          } else if (equivalent.contractAddress) {
+            // Check ERC20 contract balance
+            crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
+              const contract = new Contract(equivalent.contractAddress!, ERC20_ABI, provider);
+              const balance = await contract.balanceOf(walletAddress);
+              console.log(`[Blockchain] ERC20 cross-chain balanceOf ${equivalent.contractAddress!.slice(0, 10)}... for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId}: ${balance.toString()}`);
+              return balance;
+            });
+            console.log(`[Blockchain] Adding cross-chain balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
+          } else {
+            continue;  // Invalid config, skip
+          }
+
           totalBalance = totalBalance + crossChainBalance;
         } catch (error) {
           console.warn(`[Blockchain] Failed to check cross-chain balance on ${equivalent.chainId}, continuing with primary balance:`, error);
