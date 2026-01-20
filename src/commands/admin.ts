@@ -495,31 +495,43 @@ async function handleRefreshLog(
     });
   logLines.push('');
 
+  // Group wallets by Discord user for multi-wallet verification
+  const walletsByUser = new Map<string, string[]>();
+  for (const wallet of allWallets) {
+    const existing = walletsByUser.get(wallet.discordId) || [];
+    existing.push(wallet.walletAddress);
+    walletsByUser.set(wallet.discordId, existing);
+  }
+
+  logLines.push(`Total users: ${walletsByUser.size}`);
+  logLines.push('');
+
   let processed = 0;
   let errors = 0;
   let rolesAdded = 0;
   let rolesRemoved = 0;
   let skippedDueToError = 0;
 
-  for (const wallet of allWallets) {
+  for (const [discordId, walletAddresses] of walletsByUser) {
     try {
       if (processed > 0) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const member = await guild.members.fetch(wallet.discordId).catch(() => null);
-      const memberName = member?.user?.tag || wallet.discordId;
+      const member = await guild.members.fetch(discordId).catch(() => null);
+      const memberName = member?.user?.tag || discordId;
 
       logLines.push(`--- ${memberName} ---`);
-      logLines.push(`Wallet: ${wallet.walletAddress}`);
+      logLines.push(`Wallets (${walletAddresses.length}): ${walletAddresses.map(w => w.slice(0, 10) + '...').join(', ')}`);
 
-      let results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+      // Verify all wallets for this user together (balances are summed)
+      let results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
 
       const hasErrors = results.some(r => r.error);
       if (hasErrors) {
         logLines.push(`⚠️ RPC errors detected, retrying...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
-        results = await blockchain.verifyAllRoles(config.roles, wallet.walletAddress);
+        results = await blockchain.verifyAllRolesMultiWallet(config.roles, walletAddresses);
       }
 
       // First pass: collect all Discord role IDs that the user qualifies for
