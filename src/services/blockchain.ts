@@ -182,7 +182,16 @@ export class BlockchainService {
               const contractAddr = equivalent.contractAddress!;
 
               // Try different staking ABIs in order of likelihood
+              // Grotto L1 staking contract uses stakes(address) - selector 0x16934fc4
               const stakingMethods = [
+                // stakes() returning tuple with amount and timestamp
+                { abi: ['function stakes(address user) view returns (uint256 amount, uint256 timestamp)'], method: 'stakes', tupleIndex: 0 },
+                // stakes() returning tuple with amount, rewards
+                { abi: ['function stakes(address user) view returns (uint256 amount, uint256 rewards)'], method: 'stakes', tupleIndex: 0 },
+                // stakes() returning tuple with amount, rewardDebt (MasterChef-style)
+                { abi: ['function stakes(address user) view returns (uint256 amount, uint256 rewardDebt)'], method: 'stakes', tupleIndex: 0 },
+                // Simple stakes returning uint256
+                { abi: ['function stakes(address user) view returns (uint256)'], method: 'stakes', tupleIndex: null },
                 // Thirdweb staking - stakers() returns tuple
                 { abi: ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'], method: 'stakers', tupleIndex: 0 },
                 // Thirdweb ERC20 staking - getStakeInfo returns tuple
@@ -191,6 +200,32 @@ export class BlockchainService {
                 { abi: ['function stakedBalance(address account) view returns (uint256)'], method: 'stakedBalance', tupleIndex: null },
                 // balanceOf (some staking contracts use this)
                 { abi: ['function balanceOf(address account) view returns (uint256)'], method: 'balanceOf', tupleIndex: null },
+                // MasterChef-style userInfo
+                { abi: ['function userInfo(address user) view returns (uint256 amount, uint256 rewardDebt)'], method: 'userInfo', tupleIndex: 0 },
+                // deposits
+                { abi: ['function deposits(address user) view returns (uint256)'], method: 'deposits', tupleIndex: null },
+                // getUserStake
+                { abi: ['function getUserStake(address user) view returns (uint256)'], method: 'getUserStake', tupleIndex: null },
+                // userStake
+                { abi: ['function userStake(address user) view returns (uint256)'], method: 'userStake', tupleIndex: null },
+                // getStakedAmount
+                { abi: ['function getStakedAmount(address user) view returns (uint256)'], method: 'getStakedAmount', tupleIndex: null },
+                // stakingBalance
+                { abi: ['function stakingBalance(address user) view returns (uint256)'], method: 'stakingBalance', tupleIndex: null },
+                // getDeposit
+                { abi: ['function getDeposit(address user) view returns (uint256)'], method: 'getDeposit', tupleIndex: null },
+                // depositOf
+                { abi: ['function depositOf(address user) view returns (uint256)'], method: 'depositOf', tupleIndex: null },
+                // getUserDeposit
+                { abi: ['function getUserDeposit(address user) view returns (uint256)'], method: 'getUserDeposit', tupleIndex: null },
+                // stakeOf
+                { abi: ['function stakeOf(address user) view returns (uint256)'], method: 'stakeOf', tupleIndex: null },
+                // getBalance (different from balanceOf)
+                { abi: ['function getBalance(address user) view returns (uint256)'], method: 'getBalance', tupleIndex: null },
+                // userStakes with tuple
+                { abi: ['function userStakes(address user) view returns (uint256 amount, uint256 timestamp)'], method: 'userStakes', tupleIndex: 0 },
+                // getStaker
+                { abi: ['function getStaker(address user) view returns (uint256 stakedAmount, uint256 rewards)'], method: 'getStaker', tupleIndex: 0 },
               ];
 
               for (const { abi, method, tupleIndex } of stakingMethods) {
