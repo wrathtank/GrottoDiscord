@@ -457,12 +457,10 @@ async function connectWithWalletConnect() {
     let EthereumProvider = window.WalletConnectProvider;
     if (!EthereumProvider) {
       console.log('Waiting for WalletConnect library...');
-      // Wait up to 10 seconds for the library to load
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('WalletConnect library timed out. Please refresh and try again.')), 10000);
 
         window.addEventListener('walletconnect-loaded', () => {
-          console.log('WalletConnect loaded event received');
           clearTimeout(timeout);
           resolve();
         }, { once: true });
@@ -472,9 +470,7 @@ async function connectWithWalletConnect() {
           reject(new Error('WalletConnect failed to load: ' + (window.WalletConnectLoadError?.message || 'Unknown error')));
         }, { once: true });
 
-        // Check again in case it loaded while we were setting up
         if (window.WalletConnectProvider) {
-          console.log('WalletConnect already loaded');
           clearTimeout(timeout);
           resolve();
         }
@@ -486,18 +482,15 @@ async function connectWithWalletConnect() {
       throw new Error('WalletConnect library not available. Please refresh the page.');
     }
 
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Connecting...</span>';
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Initializing...</span>';
     console.log('Initializing WalletConnect provider...');
 
     walletConnectProvider = await EthereumProvider.init({
       projectId: WALLETCONNECT_PROJECT_ID,
       chains: [43114], // Avalanche C-Chain
       optionalChains: [1, 43114], // Ethereum mainnet and Avalanche
-      showQrModal: true,
-      qrModalOptions: {
-        themeMode: 'dark',
-        enableExplorer: true
-      },
+      showQrModal: !isMobile, // Don't show modal on mobile - we'll deep link instead
       metadata: {
         name: 'The Grotto',
         description: 'Wallet Verification for The Grotto Discord',
@@ -506,15 +499,36 @@ async function connectWithWalletConnect() {
       }
     });
 
-    console.log('WalletConnect provider initialized, enabling connection...');
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Approve in wallet...</span>';
+    console.log('WalletConnect provider initialized');
+
+    // On mobile, we need to handle the connection differently
+    if (isMobile) {
+      btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Opening wallet...</span>';
+
+      // Listen for the display_uri event to get the WalletConnect URI
+      walletConnectProvider.on('display_uri', (uri) => {
+        console.log('Got WalletConnect URI:', uri);
+        // Create deep link for Core wallet
+        // Core wallet uses: https://core.app/wc?uri=<encoded_uri>
+        const encodedUri = encodeURIComponent(uri);
+        const coreDeepLink = `https://core.app/wc?uri=${encodedUri}`;
+        console.log('Opening Core deep link:', coreDeepLink);
+        window.location.href = coreDeepLink;
+      });
+    }
+
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Connecting...</span>';
 
     // Connect and get accounts with timeout
-    const connectPromise = walletConnectProvider.enable();
+    const connectPromise = walletConnectProvider.connect();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 60000)
+      setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 120000)
     );
-    const accounts = await Promise.race([connectPromise, timeoutPromise]);
+
+    await Promise.race([connectPromise, timeoutPromise]);
+
+    // Get accounts after connection
+    const accounts = await walletConnectProvider.enable();
 
     if (!accounts || accounts.length === 0) {
       throw new Error('No accounts returned from WalletConnect');
