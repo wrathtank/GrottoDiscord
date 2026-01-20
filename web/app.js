@@ -77,6 +77,10 @@ const stepError = document.getElementById('step-error');
 const btnConnect = document.getElementById('btn-connect');
 const btnSign = document.getElementById('btn-sign');
 const btnRetry = document.getElementById('btn-retry');
+const btnCore = document.getElementById('btn-core');
+const btnMetamask = document.getElementById('btn-metamask');
+const walletSelect = document.getElementById('wallet-select');
+const walletButtons = document.getElementById('wallet-buttons');
 
 const signMessage = document.getElementById('sign-message');
 const verifiedWallet = document.getElementById('verified-wallet');
@@ -84,6 +88,9 @@ const rolesAssigned = document.getElementById('roles-assigned');
 const errorMessage = document.getElementById('error-message');
 const walletInfo = document.getElementById('wallet-info');
 const walletAddressDisplay = document.getElementById('wallet-address');
+
+// Selected provider for connection
+let selectedProvider = null;
 
 // Check if we have a valid session - show landing or verification
 if (sessionId && apiUrl) {
@@ -119,41 +126,89 @@ function formatAddress(address) {
 // Check for wallet availability
 function hasWallet() {
   return typeof window.ethereum !== 'undefined' ||
-         typeof window.web3 !== 'undefined';
+         typeof window.web3 !== 'undefined' ||
+         typeof window.avalanche !== 'undefined';
 }
 
-// Connect wallet
-async function connectWallet() {
-  try {
-    // Check for wallet
-    if (!hasWallet()) {
-      // On mobile, might need to open in wallet browser
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (isMobile) {
-        showError('Please open this page in your wallet app browser (MetaMask, Trust Wallet, etc.)');
-      } else {
-        showError('No wallet detected! Please install MetaMask or another Web3 wallet.');
-      }
-      return;
+// Check which wallets are available
+function getAvailableWallets() {
+  const wallets = [];
+
+  // Check for Core wallet (window.avalanche)
+  if (typeof window.avalanche !== 'undefined') {
+    wallets.push({ name: 'core', provider: window.avalanche });
+  }
+
+  // Check for MetaMask or other ethereum providers
+  if (typeof window.ethereum !== 'undefined') {
+    // Check if it's MetaMask specifically
+    if (window.ethereum.isMetaMask) {
+      wallets.push({ name: 'metamask', provider: window.ethereum });
+    } else {
+      wallets.push({ name: 'ethereum', provider: window.ethereum });
     }
+  }
 
+  // Fallback to web3 provider
+  if (wallets.length === 0 && typeof window.web3?.currentProvider !== 'undefined') {
+    wallets.push({ name: 'web3', provider: window.web3.currentProvider });
+  }
+
+  return wallets;
+}
+
+// Show wallet selection if multiple wallets available
+function handleConnectClick() {
+  const wallets = getAvailableWallets();
+
+  if (wallets.length === 0) {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      showError('Please open this page in your wallet app browser (Core, MetaMask, Trust Wallet, etc.)');
+    } else {
+      showError('No wallet detected! Please install Core Wallet or MetaMask.');
+    }
+    return;
+  }
+
+  // Check if both Core and another wallet are available
+  const hasCore = wallets.some(w => w.name === 'core');
+  const hasOther = wallets.some(w => w.name !== 'core');
+
+  if (hasCore && hasOther) {
+    // Show wallet selection
+    walletButtons.classList.add('hidden');
+    walletSelect.classList.remove('hidden');
+  } else if (hasCore) {
+    // Only Core available
+    connectWithProvider(window.avalanche, 'Core');
+  } else {
+    // Only other wallet available
+    connectWithProvider(window.ethereum || window.web3?.currentProvider, 'Wallet');
+  }
+}
+
+// Connect with specific provider
+async function connectWithProvider(ethereumProvider, walletName) {
+  try {
     btnConnect.innerHTML = '<span>CONNECTING...</span>';
+    if (btnCore) btnCore.innerHTML = '<img src="https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png" alt="Core" class="wallet-icon"><span>Connecting...</span>';
+    if (btnMetamask) btnMetamask.innerHTML = '<img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" class="wallet-icon"><span>Connecting...</span>';
 
-    // Get ethereum provider
-    const ethereum = window.ethereum || window.web3?.currentProvider;
+    selectedProvider = ethereumProvider;
 
     // Request accounts
-    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+    const accounts = await ethereumProvider.request({ method: 'eth_requestAccounts' });
 
     if (!accounts || accounts.length === 0) {
       throw new Error('No accounts returned');
     }
 
     walletAddress = accounts[0];
-    console.log('Connected wallet:', walletAddress);
+    console.log(`Connected ${walletName} wallet:`, walletAddress);
 
     // Create provider and signer
-    provider = new ethers.providers.Web3Provider(ethereum);
+    provider = new ethers.providers.Web3Provider(ethereumProvider);
     signer = provider.getSigner();
 
     // Update UI
@@ -166,7 +221,7 @@ async function connectWallet() {
 
   } catch (error) {
     console.error('Connection error:', error);
-    btnConnect.innerHTML = '<span>CONNECT WALLET</span>';
+    resetConnectButtons();
     if (error.code === 4001) {
       showError('Connection rejected. Please approve the connection request.');
     } else if (error.message) {
@@ -175,6 +230,20 @@ async function connectWallet() {
       showError('Failed to connect wallet. Please try again.');
     }
   }
+}
+
+// Reset connect buttons
+function resetConnectButtons() {
+  btnConnect.innerHTML = '<span>CONNECT WALLET</span>';
+  if (btnCore) btnCore.innerHTML = '<img src="https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png" alt="Core" class="wallet-icon"><span>Core Wallet</span>';
+  if (btnMetamask) btnMetamask.innerHTML = '<img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" class="wallet-icon"><span>MetaMask / Other</span>';
+  walletButtons.classList.remove('hidden');
+  walletSelect.classList.add('hidden');
+}
+
+// Legacy function for backwards compatibility
+async function connectWallet() {
+  handleConnectClick();
 }
 
 // Sign message and verify
@@ -274,8 +343,9 @@ async function submitVerification() {
 
 // Retry
 function retry() {
-  btnConnect.innerHTML = '<span>CONNECT WALLET</span>';
+  resetConnectButtons();
   btnSign.innerHTML = '<span>SIGN MESSAGE</span>';
+  selectedProvider = null;
   showStep(stepConnect);
 }
 
@@ -284,17 +354,36 @@ btnConnect.addEventListener('click', connectWallet);
 btnSign.addEventListener('click', signMessageWithWallet);
 btnRetry.addEventListener('click', retry);
 
-// Listen for account changes
+// Wallet selection button listeners
+if (btnCore) {
+  btnCore.addEventListener('click', () => connectWithProvider(window.avalanche, 'Core'));
+}
+if (btnMetamask) {
+  btnMetamask.addEventListener('click', () => connectWithProvider(window.ethereum || window.web3?.currentProvider, 'MetaMask'));
+}
+
+// Listen for account changes on the selected provider
+function setupAccountChangeListener(ethereumProvider) {
+  if (ethereumProvider && ethereumProvider.on) {
+    ethereumProvider.on('accountsChanged', (accounts) => {
+      if (accounts.length === 0) {
+        walletInfo.classList.add('hidden');
+        resetConnectButtons();
+        showStep(stepConnect);
+      } else {
+        walletAddress = accounts[0];
+        walletAddressDisplay.textContent = formatAddress(walletAddress);
+      }
+    });
+  }
+}
+
+// Set up listeners for all available providers
 if (window.ethereum) {
-  window.ethereum.on('accountsChanged', (accounts) => {
-    if (accounts.length === 0) {
-      walletInfo.classList.add('hidden');
-      showStep(stepConnect);
-    } else {
-      walletAddress = accounts[0];
-      walletAddressDisplay.textContent = formatAddress(walletAddress);
-    }
-  });
+  setupAccountChangeListener(window.ethereum);
+}
+if (window.avalanche && window.avalanche !== window.ethereum) {
+  setupAccountChangeListener(window.avalanche);
 }
 
 

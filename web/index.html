@@ -45,9 +45,21 @@
       <div id="step-connect" class="step active">
         <h2>CONNECT YOUR WALLET</h2>
         <p>Link your wallet to verify your holdings</p>
-        <button id="btn-connect" class="btn-fire">
-          <span>CONNECT WALLET</span>
-        </button>
+        <div id="wallet-buttons" class="wallet-buttons">
+          <button id="btn-connect" class="btn-fire">
+            <span>CONNECT WALLET</span>
+          </button>
+        </div>
+        <div id="wallet-select" class="wallet-select hidden">
+          <button id="btn-core" class="btn-wallet">
+            <img src="https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png" alt="Core" class="wallet-icon">
+            <span>Core Wallet</span>
+          </button>
+          <button id="btn-metamask" class="btn-wallet">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" class="wallet-icon">
+            <span>MetaMask / Other</span>
+          </button>
+        </div>
       </div>
 
       <div id="step-sign" class="step">
