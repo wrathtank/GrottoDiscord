@@ -197,7 +197,7 @@ async function handleConnectClick() {
   // On mobile, wait a moment for provider injection if needed
   if (isMobile && wallets.length === 0) {
     btnConnect.innerHTML = '<span>DETECTING...</span>';
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     wallets = getAvailableWallets();
   }
 
@@ -213,15 +213,17 @@ async function handleConnectClick() {
     return;
   }
 
-  // On mobile without injected wallet - show wallet selection with WalletConnect
-  if (isMobile) {
-    walletButtons.classList.add('hidden');
-    walletSelect.classList.remove('hidden');
+  // On mobile - try to connect to ANY available ethereum provider directly
+  if (isMobile && window.ethereum) {
+    console.log('Mobile: trying direct ethereum provider connection...');
+    btnConnect.innerHTML = '<span>CONNECTING...</span>';
+    connectWithProvider(window.ethereum, 'Wallet');
+    return;
+  }
 
-    // Hide unavailable wallet buttons on mobile
-    if (btnCore) btnCore.style.display = hasCore ? 'flex' : 'none';
-    if (btnMetamask) btnMetamask.style.display = hasOther ? 'flex' : 'none';
-    if (btnWalletConnect) btnWalletConnect.style.display = 'flex'; // Always show WalletConnect on mobile
+  // On mobile without any provider - show error with instructions
+  if (isMobile && !window.ethereum && !window.avalanche) {
+    showError('No wallet detected. If you are in Core wallet browser, please refresh the page. Otherwise, try on desktop.');
     return;
   }
 
