@@ -138,13 +138,11 @@ function hasWallet() {
 // Detect if this is Core wallet
 function isCoreWallet(provider) {
   if (!provider) return false;
-  // Core wallet can be detected by various flags
+  // Core wallet has specific flags - don't use chainId as other wallets can be on Avalanche
   return provider.isAvalanche ||
          provider.isCoreWallet ||
          provider.isCore ||
-         provider.isAvalancheWallet ||
-         (provider.chainId === '0xa86a') || // Avalanche C-Chain
-         (provider._state?.accounts?.length > 0 && provider.isConnected?.());
+         provider.isAvalancheWallet;
 }
 
 // Check which wallets are available
@@ -227,23 +225,20 @@ async function handleConnectClick() {
     return;
   }
 
-  // Desktop flow
-  if (wallets.length === 0) {
+  // Desktop flow - always show wallet selection so user can choose
+  if (wallets.length === 0 && !window.ethereum) {
     showError('No wallet detected! Please install Core Wallet or MetaMask.');
     return;
   }
 
-  if (hasCore && hasOther) {
-    // Show wallet selection
-    walletButtons.classList.add('hidden');
-    walletSelect.classList.remove('hidden');
-  } else if (hasCore) {
-    // Only Core available
-    connectWithProvider(coreWallet.provider, 'Core');
-  } else {
-    // Only other wallet available
-    connectWithProvider(window.ethereum || window.web3?.currentProvider, 'Wallet');
-  }
+  // Always show wallet selection on desktop
+  walletButtons.classList.add('hidden');
+  walletSelect.classList.remove('hidden');
+
+  // Show/hide buttons based on what's available
+  if (btnCore) btnCore.style.display = (hasCore || window.avalanche) ? 'flex' : 'none';
+  if (btnMetamask) btnMetamask.style.display = window.ethereum ? 'flex' : 'none';
+  if (btnWalletConnect) btnWalletConnect.style.display = 'flex';
 }
 
 // Connect with specific provider
