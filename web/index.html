@@ -114,7 +114,12 @@
   <div id="cursor-trail"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-  <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.11.2/dist/index.umd.js"></script>
+  <script type="module">
+    // Load WalletConnect as ES module and expose globally
+    import EthereumProvider from 'https://esm.sh/@walletconnect/ethereum-provider@2.11.2';
+    window.WalletConnectProvider = EthereumProvider;
+    window.dispatchEvent(new Event('walletconnect-loaded'));
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

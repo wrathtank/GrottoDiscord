@@ -398,8 +398,24 @@ async function connectWithWalletConnect() {
   try {
     btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Connecting...</span>';
 
-    // Initialize WalletConnect provider
-    const EthereumProvider = window.EthereumProvider?.default || window.EthereumProvider;
+    // Wait for WalletConnect library to load if needed
+    let EthereumProvider = window.WalletConnectProvider;
+    if (!EthereumProvider) {
+      // Wait up to 5 seconds for the library to load
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('WalletConnect library timed out. Please refresh the page.')), 5000);
+        window.addEventListener('walletconnect-loaded', () => {
+          clearTimeout(timeout);
+          resolve();
+        }, { once: true });
+        // Check again in case it loaded while we were setting up
+        if (window.WalletConnectProvider) {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+      EthereumProvider = window.WalletConnectProvider;
+    }
 
     if (!EthereumProvider) {
       throw new Error('WalletConnect library not loaded. Please refresh the page.');
