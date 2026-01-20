@@ -53,13 +53,13 @@ interface CrossChainToken {
 const ERC20_CROSS_CHAIN_MAP: Record<string, CrossChainToken[]> = {
   // HERESY on AVAX -> also check Wrapped HERESY, Native HERESY, and Staked HERESY on Grotto L1
   '0x432d38f83a50ec77c409d086e97448794cf76dcf': [
-    { contractAddress: '0xbA90A70ba89Ea3A2b2e9B9ebcD16239aAA531042', chainId: 'grotto' },  // Wrapped HERESY
+    { contractAddress: '0xfa99b368b5fc1f5a061bc393dff73be8a097667d', chainId: 'grotto' },  // Wrapped HERESY (wHERESY)
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
     { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
-  // Wrapped HERESY on Grotto L1 -> also check Native HERESY on AVAX, native + staked on Grotto
-  '0xba90a70ba89ea3a2b2e9b9ebcd16239aaa531042': [
-    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },  // Native HERESY on AVAX
+  // Wrapped HERESY (wHERESY) on Grotto L1 -> also check HERESY on AVAX, native + staked on Grotto
+  '0xfa99b368b5fc1f5a061bc393dff73be8a097667d': [
+    { contractAddress: '0x432d38f83a50ec77c409d086e97448794cf76dcf', chainId: 'avax' },  // HERESY on AVAX C-Chain
     { chainId: 'grotto', native: true },  // Native gas token on Grotto L1
     { contractAddress: '0x0eDc665115951c3838D399d89fDD647B02361588', chainId: 'grotto', staked: true },  // Staked native HERESY
   ],
@@ -170,14 +170,37 @@ export class BlockchainService {
             });
             console.log(`[Blockchain] Adding native balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
           } else if (equivalent.staked && equivalent.contractAddress) {
-            // Check staked balance via stakers() method
-            const STAKING_ABI = ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'];
+            // Check staked balance - try multiple common staking contract methods
             crossChainBalance = await this.withFallback(equivalent.chainId, async (provider) => {
-              const contract = new Contract(equivalent.contractAddress!, STAKING_ABI, provider);
-              const result = await contract.stakers(walletAddress);
-              const amountStaked = result[0];
-              console.log(`[Blockchain] Staked balance for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId} (${equivalent.contractAddress!.slice(0, 10)}...): ${amountStaked.toString()}`);
-              return amountStaked;
+              const contractAddr = equivalent.contractAddress!;
+
+              // Try different staking ABIs in order of likelihood
+              const stakingMethods = [
+                // Thirdweb staking - stakers() returns tuple
+                { abi: ['function stakers(address) view returns (uint256 amountStaked, uint256 conditionId, uint256 lastUpdate, uint256 unclaimedRewards)'], method: 'stakers', tupleIndex: 0 },
+                // Thirdweb ERC20 staking - getStakeInfo returns tuple
+                { abi: ['function getStakeInfo(address staker) view returns (uint256 tokensStaked, uint256 rewards)'], method: 'getStakeInfo', tupleIndex: 0 },
+                // Simple stakedBalance
+                { abi: ['function stakedBalance(address account) view returns (uint256)'], method: 'stakedBalance', tupleIndex: null },
+                // balanceOf (some staking contracts use this)
+                { abi: ['function balanceOf(address account) view returns (uint256)'], method: 'balanceOf', tupleIndex: null },
+              ];
+
+              for (const { abi, method, tupleIndex } of stakingMethods) {
+                try {
+                  const contract = new Contract(contractAddr, abi, provider);
+                  const result = await contract[method](walletAddress);
+                  const balance = tupleIndex !== null ? BigInt(result[tupleIndex]) : BigInt(result);
+                  console.log(`[Blockchain] Staked balance via ${method}() for ${walletAddress.slice(0, 10)}... on ${equivalent.chainId}: ${balance.toString()}`);
+                  return balance;
+                } catch (methodError) {
+                  console.log(`[Blockchain] Method ${method}() failed on ${contractAddr.slice(0, 10)}..., trying next...`);
+                  continue;
+                }
+              }
+
+              console.warn(`[Blockchain] All staking methods failed for ${contractAddr}`);
+              return 0n;
             });
             console.log(`[Blockchain] Adding staked balance ${crossChainBalance.toString()} from ${equivalent.chainId}`);
           } else if (equivalent.contractAddress) {
