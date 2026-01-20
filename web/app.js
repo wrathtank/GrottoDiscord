@@ -135,18 +135,45 @@ function hasWallet() {
          typeof window.avalanche !== 'undefined';
 }
 
+// Detect if this is Core wallet
+function isCoreWallet(provider) {
+  if (!provider) return false;
+  // Core wallet can be detected by various flags
+  return provider.isAvalanche ||
+         provider.isCoreWallet ||
+         provider.isCore ||
+         provider.isAvalancheWallet ||
+         (provider.chainId === '0xa86a') || // Avalanche C-Chain
+         (provider._state?.accounts?.length > 0 && provider.isConnected?.());
+}
+
 // Check which wallets are available
 function getAvailableWallets() {
   const wallets = [];
 
-  // Check for Core wallet (window.avalanche)
+  // Debug logging for mobile
+  console.log('Wallet detection:', {
+    ethereum: typeof window.ethereum,
+    avalanche: typeof window.avalanche,
+    ethereumFlags: window.ethereum ? {
+      isMetaMask: window.ethereum.isMetaMask,
+      isAvalanche: window.ethereum.isAvalanche,
+      isCoreWallet: window.ethereum.isCoreWallet,
+      isCore: window.ethereum.isCore,
+      chainId: window.ethereum.chainId
+    } : null
+  });
+
+  // Check for Core wallet - can be window.avalanche OR window.ethereum with Core flags
   if (typeof window.avalanche !== 'undefined') {
     wallets.push({ name: 'core', provider: window.avalanche });
+  } else if (typeof window.ethereum !== 'undefined' && isCoreWallet(window.ethereum)) {
+    // Core wallet injecting as window.ethereum
+    wallets.push({ name: 'core', provider: window.ethereum });
   }
 
-  // Check for MetaMask or other ethereum providers
-  if (typeof window.ethereum !== 'undefined') {
-    // Check if it's MetaMask specifically
+  // Check for MetaMask or other ethereum providers (but not if it's Core)
+  if (typeof window.ethereum !== 'undefined' && !isCoreWallet(window.ethereum)) {
     if (window.ethereum.isMetaMask) {
       wallets.push({ name: 'metamask', provider: window.ethereum });
     } else {
@@ -163,31 +190,46 @@ function getAvailableWallets() {
 }
 
 // Show wallet selection if multiple wallets available
-function handleConnectClick() {
-  const wallets = getAvailableWallets();
+async function handleConnectClick() {
+  let wallets = getAvailableWallets();
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  // On mobile, always show wallet selection with WalletConnect option
+  // On mobile, wait a moment for provider injection if needed
+  if (isMobile && wallets.length === 0) {
+    btnConnect.innerHTML = '<span>DETECTING...</span>';
+    await new Promise(resolve => setTimeout(resolve, 500));
+    wallets = getAvailableWallets();
+  }
+
+  // Check for Core wallet
+  const coreWallet = wallets.find(w => w.name === 'core');
+  const hasCore = !!coreWallet;
+  const hasOther = wallets.some(w => w.name === 'metamask' || w.name === 'ethereum');
+
+  // On mobile in Core browser - connect directly if Core is detected
+  if (isMobile && hasCore) {
+    console.log('Mobile Core wallet detected, connecting directly...');
+    connectWithProvider(coreWallet.provider, 'Core');
+    return;
+  }
+
+  // On mobile without injected wallet - show wallet selection with WalletConnect
   if (isMobile) {
-    // Show wallet selection with WalletConnect
     walletButtons.classList.add('hidden');
     walletSelect.classList.remove('hidden');
 
     // Hide unavailable wallet buttons on mobile
-    if (btnCore) btnCore.style.display = wallets.some(w => w.name === 'core') ? 'flex' : 'none';
-    if (btnMetamask) btnMetamask.style.display = wallets.some(w => w.name === 'metamask' || w.name === 'ethereum') ? 'flex' : 'none';
+    if (btnCore) btnCore.style.display = hasCore ? 'flex' : 'none';
+    if (btnMetamask) btnMetamask.style.display = hasOther ? 'flex' : 'none';
     if (btnWalletConnect) btnWalletConnect.style.display = 'flex'; // Always show WalletConnect on mobile
     return;
   }
 
+  // Desktop flow
   if (wallets.length === 0) {
     showError('No wallet detected! Please install Core Wallet or MetaMask.');
     return;
   }
-
-  // Check if both Core and another wallet are available
-  const hasCore = wallets.some(w => w.name === 'core');
-  const hasOther = wallets.some(w => w.name !== 'core');
 
   if (hasCore && hasOther) {
     // Show wallet selection
@@ -195,7 +237,7 @@ function handleConnectClick() {
     walletSelect.classList.remove('hidden');
   } else if (hasCore) {
     // Only Core available
-    connectWithProvider(window.avalanche, 'Core');
+    connectWithProvider(coreWallet.provider, 'Core');
   } else {
     // Only other wallet available
     connectWithProvider(window.ethereum || window.web3?.currentProvider, 'Wallet');
@@ -384,7 +426,15 @@ btnRetry.addEventListener('click', retry);
 
 // Wallet selection button listeners
 if (btnCore) {
-  btnCore.addEventListener('click', () => connectWithProvider(window.avalanche, 'Core'));
+  btnCore.addEventListener('click', () => {
+    // Core can be window.avalanche OR window.ethereum with Core flags
+    const provider = window.avalanche || (isCoreWallet(window.ethereum) ? window.ethereum : null);
+    if (provider) {
+      connectWithProvider(provider, 'Core');
+    } else {
+      showError('Core wallet not detected. Please make sure Core wallet is installed.');
+    }
+  });
 }
 if (btnMetamask) {
   btnMetamask.addEventListener('click', () => connectWithProvider(window.ethereum || window.web3?.currentProvider, 'MetaMask'));
