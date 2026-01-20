@@ -255,6 +255,9 @@ async function handleForceUnlink(
   const guild = interaction.guild;
   if (guild) {
     try {
+      // Fetch all guild roles to populate the cache
+      await guild.roles.fetch();
+
       const member = await guild.members.fetch(user.id);
       const roleAssignments = await getRoleAssignments(user.id);
 
@@ -307,6 +310,9 @@ async function handleRefreshAll(
     await interaction.editReply({ content: '❌ Could not find guild.' });
     return;
   }
+
+  // Fetch all guild roles to populate the cache
+  await guild.roles.fetch();
 
   let processed = 0;
   let errors = 0;
@@ -463,6 +469,10 @@ async function handleRefreshLog(
     await interaction.editReply({ content: '❌ Could not find guild.' });
     return;
   }
+
+  // Fetch all guild roles to populate the cache
+  // This ensures guild.roles.cache.get() works correctly
+  await guild.roles.fetch();
 
   const logLines: string[] = [];
   logLines.push(`=== REFRESH LOG ${new Date().toISOString()} ===`);
