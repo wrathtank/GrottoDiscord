@@ -204,40 +204,21 @@ async function handleConnectClick() {
   const hasCore = !!coreWallet;
   const hasOther = wallets.some(w => w.name === 'metamask' || w.name === 'ethereum');
 
-  // On mobile in Core browser - connect directly if Core is detected
+  // On mobile in Core browser - connect directly if Core provider is detected
   if (isMobile && hasCore) {
     console.log('Mobile Core wallet detected, connecting directly...');
     connectWithProvider(coreWallet.provider, 'Core');
     return;
   }
 
-  // On mobile - try to connect to ANY available ethereum provider directly
-  if (isMobile && window.ethereum) {
-    console.log('Mobile: trying direct ethereum provider connection...');
-    btnConnect.innerHTML = '<span>CONNECTING...</span>';
-    connectWithProvider(window.ethereum, 'Wallet');
-    return;
-  }
-
-  // On mobile without any provider - show error with instructions
-  if (isMobile && !window.ethereum && !window.avalanche) {
-    showError('No wallet detected. If you are in Core wallet browser, please refresh the page. Otherwise, try on desktop.');
-    return;
-  }
-
-  // Desktop flow - always show wallet selection so user can choose
-  if (wallets.length === 0 && !window.ethereum) {
-    showError('No wallet detected! Please install Core Wallet or MetaMask.');
-    return;
-  }
-
-  // Always show wallet selection on desktop
+  // Always show wallet selection - let user choose
   walletButtons.classList.add('hidden');
   walletSelect.classList.remove('hidden');
 
   // Show/hide buttons based on what's available
   if (btnCore) btnCore.style.display = (hasCore || window.avalanche) ? 'flex' : 'none';
   if (btnMetamask) btnMetamask.style.display = window.ethereum ? 'flex' : 'none';
+  // Always show WalletConnect - it works on mobile and desktop
   if (btnWalletConnect) btnWalletConnect.style.display = 'flex';
 }
 
@@ -479,16 +460,14 @@ async function connectWithWalletConnect() {
       throw new Error('WalletConnect library not available. Please refresh the page.');
     }
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Initializing...</span>';
-    console.log('Initializing WalletConnect provider, isMobile:', isMobile);
 
-    // On mobile, disable the modal and handle deep linking ourselves
+    // Always show modal - let WalletConnect handle everything
     walletConnectProvider = await EthereumProvider.init({
       projectId: WALLETCONNECT_PROJECT_ID,
       chains: [43114], // Avalanche C-Chain
       optionalChains: [1, 43114],
-      showQrModal: !isMobile, // Only show modal on desktop
+      showQrModal: true,
       metadata: {
         name: 'The Grotto',
         description: 'Wallet Verification for The Grotto Discord',
@@ -498,23 +477,9 @@ async function connectWithWalletConnect() {
     });
 
     console.log('WalletConnect provider initialized');
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Scan QR / Select...</span>';
 
-    // On mobile, set up URI handler BEFORE calling connect
-    if (isMobile) {
-      walletConnectProvider.on('display_uri', (uri) => {
-        console.log('WalletConnect URI received:', uri.substring(0, 50) + '...');
-        btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Opening Core...</span>';
-
-        // Deep link to Core wallet
-        const encodedUri = encodeURIComponent(uri);
-        // Try Core's native scheme first
-        window.location.href = `core://wc?uri=${encodedUri}`;
-      });
-    }
-
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Connecting...</span>';
-
-    // Start connection - this triggers display_uri event
+    // Start connection - modal will handle wallet selection
     const connectPromise = walletConnectProvider.connect();
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 120000)
