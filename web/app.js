@@ -138,13 +138,11 @@ function hasWallet() {
 // Detect if this is Core wallet
 function isCoreWallet(provider) {
   if (!provider) return false;
-  // Core wallet can be detected by various flags
+  // Core wallet has specific flags - don't use chainId as other wallets can be on Avalanche
   return provider.isAvalanche ||
          provider.isCoreWallet ||
          provider.isCore ||
-         provider.isAvalancheWallet ||
-         (provider.chainId === '0xa86a') || // Avalanche C-Chain
-         (provider._state?.accounts?.length > 0 && provider.isConnected?.());
+         provider.isAvalancheWallet;
 }
 
 // Check which wallets are available
@@ -197,7 +195,7 @@ async function handleConnectClick() {
   // On mobile, wait a moment for provider injection if needed
   if (isMobile && wallets.length === 0) {
     btnConnect.innerHTML = '<span>DETECTING...</span>';
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     wallets = getAvailableWallets();
   }
 
@@ -206,42 +204,22 @@ async function handleConnectClick() {
   const hasCore = !!coreWallet;
   const hasOther = wallets.some(w => w.name === 'metamask' || w.name === 'ethereum');
 
-  // On mobile in Core browser - connect directly if Core is detected
+  // On mobile in Core browser - connect directly if Core provider is detected
   if (isMobile && hasCore) {
     console.log('Mobile Core wallet detected, connecting directly...');
     connectWithProvider(coreWallet.provider, 'Core');
     return;
   }
 
-  // On mobile without injected wallet - show wallet selection with WalletConnect
-  if (isMobile) {
-    walletButtons.classList.add('hidden');
-    walletSelect.classList.remove('hidden');
+  // Always show wallet selection - let user choose
+  walletButtons.classList.add('hidden');
+  walletSelect.classList.remove('hidden');
 
-    // Hide unavailable wallet buttons on mobile
-    if (btnCore) btnCore.style.display = hasCore ? 'flex' : 'none';
-    if (btnMetamask) btnMetamask.style.display = hasOther ? 'flex' : 'none';
-    if (btnWalletConnect) btnWalletConnect.style.display = 'flex'; // Always show WalletConnect on mobile
-    return;
-  }
-
-  // Desktop flow
-  if (wallets.length === 0) {
-    showError('No wallet detected! Please install Core Wallet or MetaMask.');
-    return;
-  }
-
-  if (hasCore && hasOther) {
-    // Show wallet selection
-    walletButtons.classList.add('hidden');
-    walletSelect.classList.remove('hidden');
-  } else if (hasCore) {
-    // Only Core available
-    connectWithProvider(coreWallet.provider, 'Core');
-  } else {
-    // Only other wallet available
-    connectWithProvider(window.ethereum || window.web3?.currentProvider, 'Wallet');
-  }
+  // Show/hide buttons based on what's available
+  if (btnCore) btnCore.style.display = (hasCore || window.avalanche) ? 'flex' : 'none';
+  if (btnMetamask) btnMetamask.style.display = window.ethereum ? 'flex' : 'none';
+  // Always show WalletConnect - it works on mobile and desktop
+  if (btnWalletConnect) btnWalletConnect.style.display = 'flex';
 }
 
 // Connect with specific provider
@@ -482,37 +460,14 @@ async function connectWithWalletConnect() {
       throw new Error('WalletConnect library not available. Please refresh the page.');
     }
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Initializing...</span>';
-    console.log('Initializing WalletConnect provider, isMobile:', isMobile);
 
-    // Always show QR modal - it handles mobile deep linking automatically
+    // Always show modal - let WalletConnect handle everything
     walletConnectProvider = await EthereumProvider.init({
       projectId: WALLETCONNECT_PROJECT_ID,
       chains: [43114], // Avalanche C-Chain
       optionalChains: [1, 43114],
       showQrModal: true,
-      qrModalOptions: {
-        themeMode: 'dark',
-        themeVariables: {
-          '--wcm-z-index': '99999'
-        },
-        // Prioritize Core wallet for mobile
-        desktopWallets: [],
-        mobileWallets: [
-          {
-            id: 'core',
-            name: 'Core',
-            links: {
-              native: 'core://',
-              universal: 'https://core.app'
-            }
-          }
-        ],
-        walletImages: {
-          core: 'https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png'
-        }
-      },
       metadata: {
         name: 'The Grotto',
         description: 'Wallet Verification for The Grotto Discord',
@@ -522,9 +477,9 @@ async function connectWithWalletConnect() {
     });
 
     console.log('WalletConnect provider initialized');
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Select wallet...</span>';
+    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Scan QR / Select...</span>';
 
-    // Connect - this should open the modal
+    // Start connection - modal will handle wallet selection
     const connectPromise = walletConnectProvider.connect();
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 120000)
