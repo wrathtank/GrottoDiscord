@@ -97,41 +97,26 @@ export async function linkWallet(
   const now = new Date().toISOString();
   const normalizedAddress = walletAddress.toLowerCase();
 
-  // Check if this wallet is already linked
-  const existingWallet = await getWalletByAddress(normalizedAddress);
+  // Use upsert on discord_id + wallet_address combination
+  // This allows multiple wallets per user, but prevents duplicate entries
+  // NOTE: Requires unique constraint on (discord_id, wallet_address) in Supabase
+  const { error } = await supabase
+    .from('linked_wallets')
+    .upsert({
+      discord_id: discordId,
+      wallet_address: normalizedAddress,
+      linked_at: now,
+      last_verified: now,
+      signature: signature || null,
+      nonce: nonce || null,
+    }, {
+      onConflict: 'discord_id,wallet_address',
+      ignoreDuplicates: false
+    });
 
-  if (existingWallet) {
-    // Update existing wallet link (same user re-verifying)
-    const { error } = await supabase
-      .from('linked_wallets')
-      .update({
-        last_verified: now,
-        signature: signature || null,
-        nonce: nonce || null,
-      })
-      .ilike('wallet_address', normalizedAddress);
-
-    if (error) {
-      console.error('[Supabase] Error updating wallet:', error);
-      throw error;
-    }
-  } else {
-    // Add new wallet for user (upsert on wallet_address, not discord_id)
-    const { error } = await supabase
-      .from('linked_wallets')
-      .insert({
-        discord_id: discordId,
-        wallet_address: normalizedAddress,
-        linked_at: now,
-        last_verified: now,
-        signature: signature || null,
-        nonce: nonce || null,
-      });
-
-    if (error) {
-      console.error('[Supabase] Error linking wallet:', error);
-      throw error;
-    }
+  if (error) {
+    console.error('[Supabase] Error linking wallet:', error);
+    throw error;
   }
 }
 
