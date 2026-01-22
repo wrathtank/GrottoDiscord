@@ -150,8 +150,8 @@ async function main(): Promise<void> {
 let refreshInterval: NodeJS.Timeout | null = null;
 let securityInterval: NodeJS.Timeout | null = null;
 
-// Security reminder messages - ticket channel: 1303907795585605672
-const TICKET_CHANNEL = '1303907795585605672';
+// Security reminder messages - ticket channel
+const TICKET_CHANNEL = '1452326140847853629';
 const securityMessages = [
   {
     title: '🔒 Security Reminder',
