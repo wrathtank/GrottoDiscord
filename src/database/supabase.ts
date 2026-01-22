@@ -97,8 +97,9 @@ export async function linkWallet(
   const now = new Date().toISOString();
   const normalizedAddress = walletAddress.toLowerCase();
 
-  // Use upsert to handle both new links and re-verification
-  // If discord_id exists, update the wallet; if wallet exists, update verification
+  // Use upsert on discord_id + wallet_address combination
+  // This allows multiple wallets per user, but prevents duplicate entries
+  // NOTE: Requires unique constraint on (discord_id, wallet_address) in Supabase
   const { error } = await supabase
     .from('linked_wallets')
     .upsert({
@@ -109,7 +110,7 @@ export async function linkWallet(
       signature: signature || null,
       nonce: nonce || null,
     }, {
-      onConflict: 'discord_id',
+      onConflict: 'discord_id,wallet_address',
       ignoreDuplicates: false
     });
 
