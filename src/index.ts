@@ -99,6 +99,7 @@ async function main(): Promise<void> {
   const cleanup = async () => {
     console.log('\n[Main] Received shutdown signal...');
     if (refreshInterval) clearInterval(refreshInterval);
+    if (securityInterval) clearInterval(securityInterval);
     await bot.stop();
     process.exit(0);
   };
@@ -125,6 +126,21 @@ async function main(): Promise<void> {
       await refreshAllWallets(bot, config);
     }, refreshMs);
 
+    // Start security reminder messages (every 4 hours)
+    const securityChannelId = '1417516224379748403';
+    const securityIntervalMs = 4 * 60 * 60 * 1000; // 4 hours
+
+    console.log(`[Scheduler] Security reminders scheduled every 4 hour(s)`);
+
+    securityInterval = setInterval(async () => {
+      await sendSecurityReminder(bot.getClient(), securityChannelId);
+    }, securityIntervalMs);
+
+    // Send first security message after 5 minutes
+    setTimeout(async () => {
+      await sendSecurityReminder(bot.getClient(), securityChannelId);
+    }, 5 * 60 * 1000);
+
   } catch (error) {
     console.error('[Main] Failed to start bot:', error);
     process.exit(1);
@@ -132,6 +148,61 @@ async function main(): Promise<void> {
 }
 
 let refreshInterval: NodeJS.Timeout | null = null;
+let securityInterval: NodeJS.Timeout | null = null;
+
+// Security reminder messages - ticket channel
+const TICKET_CHANNEL = '1452326140847853629';
+const securityMessages = [
+  {
+    title: '🔒 Security Reminder',
+    description: `**No team member will ever DM you first!**\n\nIf someone DMs you claiming to be from The Grotto team, it's a scam. Block and report them immediately.\n\nNeed help? Open a ticket in <#${TICKET_CHANNEL}>`,
+    color: 0xff0033
+  },
+  {
+    title: '⚠️ Stay Safe',
+    description: `**Never share your seed phrase or private keys!**\n\nNo legitimate team member, admin, or bot will ever ask for your seed phrase. Anyone who does is trying to steal your funds.\n\nFor support, open a ticket in <#${TICKET_CHANNEL}>`,
+    color: 0xff6600
+  },
+  {
+    title: '🛡️ Protect Yourself',
+    description: `**Always verify links before clicking!**\n\nScammers create fake websites that look identical to real ones. Double-check URLs and only use official links from announcements.\n\nQuestions? Open a ticket in <#${TICKET_CHANNEL}>`,
+    color: 0xff0033
+  },
+  {
+    title: '🚨 Scam Alert',
+    description: `**Beware of fake giveaways and airdrops!**\n\nIf it sounds too good to be true, it probably is. Official giveaways are only announced in official channels.\n\nReport suspicious activity in <#${TICKET_CHANNEL}>`,
+    color: 0xff3300
+  }
+];
+
+async function sendSecurityReminder(client: any, channelId: string): Promise<void> {
+  try {
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+      console.log('[Security] Could not find security channel:', channelId);
+      return;
+    }
+
+    // Pick a random message
+    const message = securityMessages[Math.floor(Math.random() * securityMessages.length)];
+
+    await channel.send({
+      embeds: [{
+        title: message.title,
+        description: message.description,
+        color: message.color,
+        footer: {
+          text: 'The Grotto • Stay vigilant, stay safe'
+        },
+        timestamp: new Date().toISOString()
+      }]
+    });
+
+    console.log('[Security] Sent security reminder to channel');
+  } catch (error) {
+    console.error('[Security] Failed to send reminder:', error);
+  }
+}
 
 async function refreshAllWallets(bot: GrottoBot, config: BotConfig): Promise<void> {
   try {
