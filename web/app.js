@@ -79,13 +79,8 @@ const btnSign = document.getElementById('btn-sign');
 const btnRetry = document.getElementById('btn-retry');
 const btnCore = document.getElementById('btn-core');
 const btnMetamask = document.getElementById('btn-metamask');
-const btnWalletConnect = document.getElementById('btn-walletconnect');
 const walletSelect = document.getElementById('wallet-select');
 const walletButtons = document.getElementById('wallet-buttons');
-
-// WalletConnect project ID - get yours at https://cloud.walletconnect.com
-const WALLETCONNECT_PROJECT_ID = urlParams.get('wcProjectId') || '3314f39613a3c6d5d5bc3f5c8c6c1e42';
-let walletConnectProvider = null;
 
 const signMessage = document.getElementById('sign-message');
 const verifiedWallet = document.getElementById('verified-wallet');
@@ -211,6 +206,12 @@ async function handleConnectClick() {
     return;
   }
 
+  // No wallet detected
+  if (!window.ethereum && !window.avalanche) {
+    showError('No wallet detected! Please install Core Wallet, MetaMask, or another browser wallet.');
+    return;
+  }
+
   // Always show wallet selection - let user choose
   walletButtons.classList.add('hidden');
   walletSelect.classList.remove('hidden');
@@ -218,8 +219,6 @@ async function handleConnectClick() {
   // Show/hide buttons based on what's available
   if (btnCore) btnCore.style.display = (hasCore || window.avalanche) ? 'flex' : 'none';
   if (btnMetamask) btnMetamask.style.display = window.ethereum ? 'flex' : 'none';
-  // Always show WalletConnect - it works on mobile and desktop
-  if (btnWalletConnect) btnWalletConnect.style.display = 'flex';
 }
 
 // Connect with specific provider
@@ -271,13 +270,11 @@ function resetConnectButtons() {
   btnConnect.innerHTML = '<span>CONNECT WALLET</span>';
   if (btnCore) btnCore.innerHTML = '<img src="https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png" alt="Core" class="wallet-icon"><span>Core Wallet</span>';
   if (btnMetamask) btnMetamask.innerHTML = '<img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" class="wallet-icon"><span>MetaMask / Other</span>';
-  if (btnWalletConnect) btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>WalletConnect</span>';
   walletButtons.classList.remove('hidden');
   walletSelect.classList.add('hidden');
   // Reset button visibility
   if (btnCore) btnCore.style.display = '';
   if (btnMetamask) btnMetamask.style.display = '';
-  if (btnWalletConnect) btnWalletConnect.style.display = '';
 }
 
 // Legacy function for backwards compatibility
@@ -381,18 +378,9 @@ async function submitVerification() {
 }
 
 // Retry
-async function retry() {
+function retry() {
   resetConnectButtons();
   btnSign.innerHTML = '<span>SIGN MESSAGE</span>';
-  // Disconnect WalletConnect if it was used
-  if (walletConnectProvider) {
-    try {
-      await walletConnectProvider.disconnect();
-    } catch (e) {
-      console.log('WalletConnect disconnect error:', e);
-    }
-    walletConnectProvider = null;
-  }
   selectedProvider = null;
   showStep(stepConnect);
 }
@@ -416,135 +404,6 @@ if (btnCore) {
 }
 if (btnMetamask) {
   btnMetamask.addEventListener('click', () => connectWithProvider(window.ethereum || window.web3?.currentProvider, 'MetaMask'));
-}
-if (btnWalletConnect) {
-  btnWalletConnect.addEventListener('click', connectWithWalletConnect);
-}
-
-// Connect via WalletConnect
-async function connectWithWalletConnect() {
-  try {
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Loading...</span>';
-
-    // Check if there was a load error
-    if (window.WalletConnectLoadError) {
-      throw new Error('WalletConnect failed to load: ' + window.WalletConnectLoadError.message);
-    }
-
-    // Wait for WalletConnect library to load if needed
-    let EthereumProvider = window.WalletConnectProvider;
-    if (!EthereumProvider) {
-      console.log('Waiting for WalletConnect library...');
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('WalletConnect library timed out. Please refresh and try again.')), 10000);
-
-        window.addEventListener('walletconnect-loaded', () => {
-          clearTimeout(timeout);
-          resolve();
-        }, { once: true });
-
-        window.addEventListener('walletconnect-error', () => {
-          clearTimeout(timeout);
-          reject(new Error('WalletConnect failed to load: ' + (window.WalletConnectLoadError?.message || 'Unknown error')));
-        }, { once: true });
-
-        if (window.WalletConnectProvider) {
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-      EthereumProvider = window.WalletConnectProvider;
-    }
-
-    if (!EthereumProvider) {
-      throw new Error('WalletConnect library not available. Please refresh the page.');
-    }
-
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Initializing...</span>';
-
-    // Always show modal - let WalletConnect handle everything
-    walletConnectProvider = await EthereumProvider.init({
-      projectId: WALLETCONNECT_PROJECT_ID,
-      chains: [43114], // Avalanche C-Chain
-      optionalChains: [1, 43114],
-      showQrModal: true,
-      metadata: {
-        name: 'The Grotto',
-        description: 'Wallet Verification for The Grotto Discord',
-        url: window.location.origin,
-        icons: ['https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png']
-      }
-    });
-
-    console.log('WalletConnect provider initialized');
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Scan QR / Select...</span>';
-
-    // Start connection - modal will handle wallet selection
-    const connectPromise = walletConnectProvider.connect();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 120000)
-    );
-
-    await Promise.race([connectPromise, timeoutPromise]);
-
-    btnWalletConnect.innerHTML = '<img src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4" alt="WalletConnect" class="wallet-icon"><span>Getting accounts...</span>';
-
-    // Get accounts after connection
-    const accounts = await walletConnectProvider.enable();
-
-    if (!accounts || accounts.length === 0) {
-      throw new Error('No accounts returned from WalletConnect');
-    }
-
-    walletAddress = accounts[0];
-    console.log('Connected via WalletConnect:', walletAddress);
-
-    // Create provider and signer using the WalletConnect provider
-    provider = new ethers.providers.Web3Provider(walletConnectProvider);
-    signer = provider.getSigner();
-
-    selectedProvider = walletConnectProvider;
-
-    // Update UI
-    walletAddressDisplay.textContent = formatAddress(walletAddress);
-    walletInfo.classList.remove('hidden');
-
-    // Show message to sign
-    signMessage.textContent = generateMessage();
-    showStep(stepSign);
-
-    // Listen for disconnect
-    walletConnectProvider.on('disconnect', () => {
-      console.log('WalletConnect disconnected');
-      walletInfo.classList.add('hidden');
-      resetConnectButtons();
-      showStep(stepConnect);
-    });
-
-    // Listen for account changes
-    walletConnectProvider.on('accountsChanged', (accounts) => {
-      if (accounts.length === 0) {
-        walletInfo.classList.add('hidden');
-        resetConnectButtons();
-        showStep(stepConnect);
-      } else {
-        walletAddress = accounts[0];
-        walletAddressDisplay.textContent = formatAddress(walletAddress);
-      }
-    });
-
-  } catch (error) {
-    console.error('WalletConnect error:', error);
-    resetConnectButtons();
-
-    if (error.message?.includes('User rejected') || error.message?.includes('user rejected')) {
-      showError('Connection rejected. Please approve the connection request.');
-    } else if (error.message) {
-      showError(`WalletConnect failed: ${error.message}`);
-    } else {
-      showError('Failed to connect via WalletConnect. Please try again.');
-    }
-  }
 }
 
 // Listen for account changes on the selected provider
