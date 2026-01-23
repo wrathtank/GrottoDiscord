@@ -126,11 +126,11 @@ async function main(): Promise<void> {
       await refreshAllWallets(bot, config);
     }, refreshMs);
 
-    // Start security reminder messages (every 4 hours)
+    // Start security reminder messages (every 30 minutes)
     const securityChannelId = '1417516224379748403';
-    const securityIntervalMs = 4 * 60 * 60 * 1000; // 4 hours
+    const securityIntervalMs = 30 * 60 * 1000; // 30 minutes
 
-    console.log(`[Scheduler] Security reminders scheduled every 4 hour(s)`);
+    console.log(`[Scheduler] Security reminders scheduled every 30 minutes`);
 
     securityInterval = setInterval(async () => {
       await sendSecurityReminder(bot.getClient(), securityChannelId);
