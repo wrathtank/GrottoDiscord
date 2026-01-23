@@ -682,7 +682,7 @@ async function handleActivity(interaction: ChatInputCommandInteraction) {
   const type = interaction.options.getString('type', true);
   const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
 
-  if (!targetChannel || !targetChannel.isTextBased()) {
+  if (!targetChannel || !('send' in targetChannel)) {
     await interaction.reply({
       content: '❌ Invalid channel specified.',
       ephemeral: true,
