@@ -70,6 +70,28 @@ export const data = new SlashCommandBuilder()
     subcommand
       .setName('refreshlog')
       .setDescription('Refresh all wallets with detailed diagnostic output')
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName('activity')
+      .setDescription('Post a Grotto game highlight or live activity message')
+      .addStringOption((option) =>
+        option
+          .setName('type')
+          .setDescription('What type of message to post')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Game Highlight', value: 'game' },
+            { name: 'Live Activity', value: 'activity' },
+            { name: 'Random', value: 'random' }
+          )
+      )
+      .addChannelOption((option) =>
+        option
+          .setName('channel')
+          .setDescription('Channel to post in (defaults to current channel)')
+          .setRequired(false)
+      )
   );
 
 export async function execute(
@@ -103,6 +125,9 @@ export async function execute(
       break;
     case 'refreshlog':
       await handleRefreshLog(interaction, blockchain, config);
+      break;
+    case 'activity':
+      await handleActivity(interaction);
       break;
   }
 }
@@ -614,4 +639,135 @@ async function handleRefreshLog(
       name: `refresh-log-${Date.now()}.txt`,
     }],
   });
+}
+
+// Grotto API interfaces and constants
+const GROTTO_API_BASE = 'https://api.enterthegrotto.xyz';
+const GROTTO_GAMES_URL = `${GROTTO_API_BASE}/api/games`;
+const GROTTO_ACTIVITY_URL = `${GROTTO_API_BASE}/api/activity/live`;
+const GROTTO_GAME_PAGE_BASE = 'https://thegrotto.gg/games';
+
+interface GrottoGame {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail_url: string;
+  creator_address: string;
+  created_at: string;
+  genre: string;
+  license_type: string;
+  license_price: number;
+}
+
+interface GrottoActivity {
+  id: string;
+  type: string;
+  user_address: string;
+  game_id: string;
+  game_name?: string;
+  details: string;
+  created_at: string;
+}
+
+function createGameSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function truncateAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+async function handleActivity(interaction: ChatInputCommandInteraction) {
+  const type = interaction.options.getString('type', true);
+  const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+
+  if (!targetChannel || !targetChannel.isTextBased()) {
+    await interaction.reply({
+      content: '❌ Invalid channel specified.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const messageType = type === 'random' ? (Math.random() < 0.5 ? 'game' : 'activity') : type;
+
+    if (messageType === 'game') {
+      const response = await fetch(GROTTO_GAMES_URL);
+      if (!response.ok) {
+        await interaction.editReply({ content: `❌ Failed to fetch games: ${response.status}` });
+        return;
+      }
+      const data = await response.json() as GrottoGame[] | { games: GrottoGame[] };
+      const games = Array.isArray(data) ? data : (data.games || []);
+
+      if (games.length === 0) {
+        await interaction.editReply({ content: '❌ No games available from the API.' });
+        return;
+      }
+
+      const game = games[Math.floor(Math.random() * games.length)];
+      const gameSlug = createGameSlug(game.name);
+      const gameUrl = `${GROTTO_GAME_PAGE_BASE}/${gameSlug}`;
+
+      const description = game.description
+        ? (game.description.length > 200 ? game.description.slice(0, 200) + '...' : game.description)
+        : 'Check out this game on The Grotto!';
+
+      await (targetChannel as any).send({
+        embeds: [{
+          title: `🎮 ${game.name}`,
+          description: `${description}\n\n**Genre:** ${game.genre || 'N/A'}\n**License:** ${game.license_type || 'N/A'}${game.license_price ? ` (${game.license_price} AVAX)` : ''}\n\n[Play Now](${gameUrl})`,
+          color: 0x7c3aed,
+          thumbnail: game.thumbnail_url ? { url: game.thumbnail_url } : undefined,
+          footer: {
+            text: `The Grotto • Created by ${truncateAddress(game.creator_address)}`
+          },
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      await interaction.editReply({ content: `✅ Posted game highlight: **${game.name}**` });
+    } else {
+      const response = await fetch(GROTTO_ACTIVITY_URL);
+      if (!response.ok) {
+        await interaction.editReply({ content: `❌ Failed to fetch activity: ${response.status}` });
+        return;
+      }
+      const data = await response.json() as GrottoActivity[] | { activity: GrottoActivity[] };
+      const activities = Array.isArray(data) ? data : (data.activity || []);
+
+      if (activities.length === 0) {
+        await interaction.editReply({ content: '❌ No live activity available from the API.' });
+        return;
+      }
+
+      const recentActivities = activities.slice(0, 5);
+      const activityLines = recentActivities.map(a => {
+        const user = truncateAddress(a.user_address);
+        const gameName = a.game_name || 'a game';
+        return `• **${user}** ${a.details || a.type} in *${gameName}*`;
+      }).join('\n');
+
+      await (targetChannel as any).send({
+        embeds: [{
+          title: '🔥 Live Activity',
+          description: `**What's happening in The Grotto:**\n\n${activityLines}\n\n[Join the action!](https://thegrotto.gg)`,
+          color: 0xf59e0b,
+          footer: {
+            text: 'The Grotto • Gaming on Avalanche'
+          },
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      await interaction.editReply({ content: `✅ Posted live activity summary (${recentActivities.length} recent activities)` });
+    }
+  } catch (error) {
+    console.error('[Admin] Activity command error:', error);
+    await interaction.editReply({ content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}` });
+  }
 }

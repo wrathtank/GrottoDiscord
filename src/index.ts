@@ -127,22 +127,31 @@ async function main(): Promise<void> {
     }, refreshMs);
 
     // Start periodic messages (security + game highlights + activity)
-    const periodicChannelId = '1417516224379748403';
+    const periodicChannelIds = [
+      '1417516224379748403',
+      '1089003955645861978'
+    ];
     const periodicIntervalMs = 30 * 60 * 1000; // 30 minutes
 
-    console.log(`[Scheduler] Periodic messages: now, 5 min, then every 30 minutes`);
+    console.log(`[Scheduler] Periodic messages to ${periodicChannelIds.length} channels: now, 5 min, then every 30 minutes`);
 
     // Send first message immediately on bot start
-    await sendPeriodicMessage(bot.getClient(), periodicChannelId);
+    for (const channelId of periodicChannelIds) {
+      await sendPeriodicMessage(bot.getClient(), channelId);
+    }
 
     // Send second message after 5 minutes
     setTimeout(async () => {
-      await sendPeriodicMessage(bot.getClient(), periodicChannelId);
+      for (const channelId of periodicChannelIds) {
+        await sendPeriodicMessage(bot.getClient(), channelId);
+      }
     }, 5 * 60 * 1000);
 
     // Then continue every 30 minutes
     securityInterval = setInterval(async () => {
-      await sendPeriodicMessage(bot.getClient(), periodicChannelId);
+      for (const channelId of periodicChannelIds) {
+        await sendPeriodicMessage(bot.getClient(), channelId);
+      }
     }, periodicIntervalMs);
 
   } catch (error) {
