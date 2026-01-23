@@ -214,7 +214,7 @@ async function fetchGrottoGames(): Promise<GrottoGame[]> {
       console.log('[Grotto] Failed to fetch games:', response.status);
       return [];
     }
-    const data = await response.json();
+    const data = await response.json() as GrottoGame[] | { games: GrottoGame[] };
     return Array.isArray(data) ? data : (data.games || []);
   } catch (error) {
     console.error('[Grotto] Error fetching games:', error);
@@ -229,7 +229,7 @@ async function fetchGrottoActivity(): Promise<GrottoActivity[]> {
       console.log('[Grotto] Failed to fetch activity:', response.status);
       return [];
     }
-    const data = await response.json();
+    const data = await response.json() as GrottoActivity[] | { activity: GrottoActivity[] };
     return Array.isArray(data) ? data : (data.activity || []);
   } catch (error) {
     console.error('[Grotto] Error fetching activity:', error);
