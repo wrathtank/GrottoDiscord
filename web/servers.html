@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Grotto - Game Servers</title>
+  <title>Grotto Servers</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -11,267 +11,121 @@
   <link rel="stylesheet" href="servers.css">
 </head>
 <body>
-  <!-- Fire particles container -->
   <div id="particles"></div>
 
-  <!-- Blood drip effect -->
-  <div class="blood-drips">
-    <div class="drip"></div>
-    <div class="drip"></div>
-    <div class="drip"></div>
-    <div class="drip"></div>
-    <div class="drip"></div>
-  </div>
-
-  <!-- Main content -->
   <div class="container servers-container">
     <div class="logo-container">
       <h1 class="glitch-text" data-text="GROTTO SERVERS">GROTTO SERVERS</h1>
     </div>
-    <p class="subtitle">GAME HOSTING SERVICE</p>
+    <p class="subtitle">DEDICATED MULTIPLAYER GAME HOSTING</p>
 
-    <!-- Wallet Connection Section -->
+    <!-- Wallet Connection -->
     <div id="wallet-section" class="wallet-section">
-      <div id="wallet-disconnected" class="wallet-connect-prompt">
-        <p>Connect your wallet to rent game servers</p>
+      <div id="wallet-disconnected">
         <button id="btn-connect-wallet" class="btn-fire">
           <span>CONNECT WALLET</span>
         </button>
       </div>
-      <div id="wallet-connected" class="wallet-connected-info hidden">
-        <div class="wallet-badge">
-          <span class="wallet-label">WALLET:</span>
-          <span id="wallet-address" class="wallet-addr"></span>
-          <span id="heresy-balance" class="heresy-balance">0 HERESY</span>
-        </div>
-        <button id="btn-disconnect" class="btn-secondary-small">DISCONNECT</button>
+      <div id="wallet-connected" class="wallet-info hidden">
+        <span id="wallet-address" class="wallet-addr"></span>
+        <span id="heresy-balance" class="heresy-balance">0 HERESY</span>
+        <button id="btn-disconnect" class="btn-small">DISCONNECT</button>
       </div>
     </div>
 
-    <!-- Main Tabs -->
-    <div class="tabs-container">
-      <button class="tab-btn active" data-tab="browse">BROWSE SERVERS</button>
-      <button class="tab-btn" data-tab="rent">RENT A SERVER</button>
-      <button class="tab-btn" data-tab="my-servers">MY SERVERS</button>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="servers">SERVERS</button>
+      <button class="tab" data-tab="rent">RENT</button>
+      <button class="tab" data-tab="my-servers">MY SERVERS</button>
     </div>
 
-    <!-- Browse Servers Tab -->
-    <div id="tab-browse" class="tab-content active">
-      <div class="servers-header">
-        <h2>AVAILABLE GAME SERVERS</h2>
-        <div class="filter-bar">
-          <select id="filter-game" class="filter-select">
-            <option value="">All Games</option>
-          </select>
-          <select id="filter-status" class="filter-select">
-            <option value="">All Status</option>
-            <option value="online">Online</option>
-            <option value="offline">Offline</option>
-          </select>
-          <button id="btn-refresh" class="btn-icon" title="Refresh">&#x21bb;</button>
-        </div>
+    <!-- Servers List -->
+    <div id="tab-servers" class="tab-content active">
+      <div class="section-header">
+        <h2>ACTIVE SERVERS</h2>
+        <button id="btn-refresh" class="btn-small">REFRESH</button>
       </div>
-
-      <div id="servers-list" class="servers-grid">
-        <div class="loading-servers">
-          <div class="loading-spinner"></div>
-          <p>Loading servers...</p>
-        </div>
+      <div id="servers-list" class="servers-list">
+        <div class="loading">Loading...</div>
       </div>
     </div>
 
-    <!-- Rent a Server Tab -->
+    <!-- Rent Server -->
     <div id="tab-rent" class="tab-content hidden">
-      <div class="rent-container">
-        <h2>RENT A GAME SERVER</h2>
-        <p class="rent-description">Host your Unity multiplayer games on The Grotto's dedicated servers. Pay with HERESY on Grotto mainnet.</p>
+      <div class="rent-card">
+        <h2>DEDICATED GAME SERVER</h2>
+        <p class="description">Host your Unity multiplayer game on Grotto infrastructure. Perfect for competitive games, co-op sessions, and persistent worlds.</p>
 
-        <div class="pricing-cards">
-          <div class="pricing-card" data-tier="basic">
-            <div class="tier-badge">BASIC</div>
-            <div class="tier-specs">
-              <p><strong>10 Players</strong></p>
-              <p>1 vCPU / 1GB RAM</p>
-              <p>Unity Netcode Support</p>
-            </div>
-            <div class="tier-price">
-              <span class="price-amount">100</span>
-              <span class="price-token">HERESY/month</span>
-            </div>
-            <button class="btn-fire btn-rent" data-tier="basic" data-price="100">
-              <span>SELECT</span>
-            </button>
-          </div>
-
-          <div class="pricing-card featured" data-tier="standard">
-            <div class="tier-badge">STANDARD</div>
-            <div class="popular-badge">MOST POPULAR</div>
-            <div class="tier-specs">
-              <p><strong>25 Players</strong></p>
-              <p>2 vCPU / 2GB RAM</p>
-              <p>Unity Netcode + Mirror</p>
-              <p>Priority Support</p>
-            </div>
-            <div class="tier-price">
-              <span class="price-amount">250</span>
-              <span class="price-token">HERESY/month</span>
-            </div>
-            <button class="btn-fire btn-rent" data-tier="standard" data-price="250">
-              <span>SELECT</span>
-            </button>
-          </div>
-
-          <div class="pricing-card" data-tier="premium">
-            <div class="tier-badge">PREMIUM</div>
-            <div class="tier-specs">
-              <p><strong>50 Players</strong></p>
-              <p>4 vCPU / 4GB RAM</p>
-              <p>All Frameworks</p>
-              <p>DDoS Protection</p>
-              <p>24/7 Support</p>
-            </div>
-            <div class="tier-price">
-              <span class="price-amount">500</span>
-              <span class="price-token">HERESY/month</span>
-            </div>
-            <button class="btn-fire btn-rent" data-tier="premium" data-price="500">
-              <span>SELECT</span>
-            </button>
-          </div>
+        <div class="specs">
+          <div class="spec"><span>Players</span><strong>Up to 32</strong></div>
+          <div class="spec"><span>CPU</span><strong>2 vCPU</strong></div>
+          <div class="spec"><span>RAM</span><strong>4 GB</strong></div>
+          <div class="spec"><span>Network</span><strong>1 Gbps</strong></div>
+          <div class="spec"><span>Support</span><strong>Unity Netcode / Mirror</strong></div>
         </div>
 
-        <!-- Server Configuration Form (shown after selecting tier) -->
-        <div id="server-config-form" class="server-config hidden">
-          <h3>CONFIGURE YOUR SERVER</h3>
-          <div class="form-group">
-            <label for="server-name">Server Name</label>
-            <input type="text" id="server-name" class="form-input" placeholder="My Awesome Game Server" maxlength="32">
+        <div class="price-box">
+          <span class="price">250</span>
+          <span class="token">HERESY / month</span>
+        </div>
+
+        <div id="rent-form" class="rent-form">
+          <div class="form-row">
+            <label>Server Name</label>
+            <input type="text" id="server-name" placeholder="My Game Server" maxlength="32">
           </div>
-          <div class="form-group">
-            <label for="game-name">Game Name</label>
-            <input type="text" id="game-name" class="form-input" placeholder="My Unity Game" maxlength="64">
+          <div class="form-row">
+            <label>Game Name</label>
+            <input type="text" id="game-name" placeholder="My Unity Game" maxlength="64">
           </div>
-          <div class="form-group">
-            <label for="server-password">Server Password (optional)</label>
-            <input type="password" id="server-password" class="form-input" placeholder="Leave empty for public server" maxlength="32">
+          <div class="form-row">
+            <label>Password (optional)</label>
+            <input type="password" id="server-password" placeholder="Leave empty for public" maxlength="32">
           </div>
-          <div class="form-group">
-            <label for="rental-duration">Rental Duration</label>
-            <select id="rental-duration" class="form-select">
-              <option value="1">1 Month</option>
-              <option value="3">3 Months (10% off)</option>
-              <option value="6">6 Months (15% off)</option>
-              <option value="12">12 Months (20% off)</option>
+          <div class="form-row">
+            <label>Duration</label>
+            <select id="rental-duration">
+              <option value="1">1 Month - 250 HERESY</option>
+              <option value="3">3 Months - 675 HERESY (10% off)</option>
+              <option value="6">6 Months - 1275 HERESY (15% off)</option>
             </select>
           </div>
-
-          <div class="order-summary">
-            <h4>ORDER SUMMARY</h4>
-            <div class="summary-row">
-              <span>Tier:</span>
-              <span id="summary-tier">-</span>
-            </div>
-            <div class="summary-row">
-              <span>Duration:</span>
-              <span id="summary-duration">-</span>
-            </div>
-            <div class="summary-row">
-              <span>Discount:</span>
-              <span id="summary-discount">-</span>
-            </div>
-            <div class="summary-row total">
-              <span>Total:</span>
-              <span id="summary-total">- HERESY</span>
-            </div>
-          </div>
-
-          <div class="form-actions">
-            <button id="btn-cancel-rent" class="btn-secondary">CANCEL</button>
-            <button id="btn-confirm-rent" class="btn-fire">
-              <span>PAY WITH HERESY</span>
-            </button>
-          </div>
+          <button id="btn-rent" class="btn-fire btn-full">
+            <span>PAY WITH HERESY</span>
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- My Servers Tab -->
+    <!-- My Servers -->
     <div id="tab-my-servers" class="tab-content hidden">
-      <div class="my-servers-container">
-        <h2>MY RENTED SERVERS</h2>
-        <div id="my-servers-list" class="my-servers-grid">
-          <div id="no-servers-message" class="no-servers">
-            <p>You don't have any rented servers yet.</p>
-            <button class="btn-fire btn-rent-first">
-              <span>RENT YOUR FIRST SERVER</span>
-            </button>
-          </div>
-        </div>
+      <h2>MY SERVERS</h2>
+      <div id="my-servers-list" class="servers-list">
+        <p class="empty-state">Connect wallet to view your servers</p>
       </div>
     </div>
   </div>
 
-  <!-- Server Details Modal -->
+  <!-- Server Modal -->
   <div id="server-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content card">
+    <div class="modal-bg"></div>
+    <div class="modal-box">
       <button class="modal-close">&times;</button>
-      <div id="modal-body">
-        <!-- Populated by JavaScript -->
-      </div>
+      <div id="modal-content"></div>
     </div>
   </div>
 
-  <!-- Payment Processing Modal -->
+  <!-- Payment Modal -->
   <div id="payment-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content card payment-card">
-      <div id="payment-step-approve" class="payment-step">
-        <h2>APPROVE HERESY</h2>
-        <p>First, approve the contract to spend your HERESY tokens.</p>
-        <div class="loading-spinner"></div>
-        <p class="payment-status">Waiting for approval...</p>
-      </div>
-      <div id="payment-step-transfer" class="payment-step hidden">
-        <h2>CONFIRM PAYMENT</h2>
-        <p>Confirm the transaction to complete your server rental.</p>
-        <div class="loading-spinner"></div>
-        <p class="payment-status">Processing payment...</p>
-      </div>
-      <div id="payment-step-success" class="payment-step hidden">
-        <h2 class="success-text">SUCCESS!</h2>
-        <p>Your server is being provisioned.</p>
-        <p class="payment-status">This may take a few minutes...</p>
-        <button id="btn-view-server" class="btn-fire">
-          <span>VIEW MY SERVERS</span>
-        </button>
-      </div>
-      <div id="payment-step-error" class="payment-step hidden">
-        <h2 class="error-text">ERROR</h2>
-        <p id="payment-error-message">Something went wrong.</p>
-        <button id="btn-retry-payment" class="btn-fire">
-          <span>TRY AGAIN</span>
-        </button>
+    <div class="modal-bg"></div>
+    <div class="modal-box payment-box">
+      <div id="payment-status">
+        <div class="spinner"></div>
+        <p id="payment-message">Processing payment...</p>
       </div>
     </div>
   </div>
-
-  <!-- Unity Integration Info -->
-  <div class="unity-info">
-    <h3>UNITY INTEGRATION</h3>
-    <p>Connect your Unity game using our simple API:</p>
-    <div class="code-block">
-      <code>
-// In your Unity NetworkManager
-serverAddress = "your-server-id.grotto.gg";
-serverPort = 7777;
-      </code>
-    </div>
-  </div>
-
-  <!-- Custom cursor -->
-  <div id="cursor" class="custom-cursor"></div>
-  <div id="cursor-trail"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
   <script src="servers.js"></script>

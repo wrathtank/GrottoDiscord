@@ -271,13 +271,13 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   // ============================================
 
   // Server pricing configuration
+  // Single tier pricing - dedicated game server
   const SERVER_PRICING = {
-    tiers: {
-      basic: { name: 'Basic', price: 100, maxPlayers: 10, cpu: 1, ram: 1 },
-      standard: { name: 'Standard', price: 250, maxPlayers: 25, cpu: 2, ram: 2 },
-      premium: { name: 'Premium', price: 500, maxPlayers: 50, cpu: 4, ram: 4 },
-    },
-    durationDiscounts: { 1: 0, 3: 0.10, 6: 0.15, 12: 0.20 },
+    price: 250, // HERESY per month
+    maxPlayers: 32,
+    cpu: 2,
+    ram: 4,
+    durationDiscounts: { 1: 0, 3: 0.10, 6: 0.15 } as Record<number, number>,
     treasuryAddress: process.env.TREASURY_ADDRESS || '0x000000000000000000000000000000000000dEaD',
   };
 
@@ -400,16 +400,8 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
-      // Validate tier
-      if (!['basic', 'standard', 'premium'].includes(tier)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid server tier.',
-        });
-      }
-
       // Validate duration
-      if (![1, 3, 6, 12].includes(duration)) {
+      if (![1, 3, 6].includes(duration)) {
         return res.status(400).json({
           success: false,
           error: 'Invalid rental duration.',
@@ -436,10 +428,9 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       // TODO: Verify transaction on-chain
       // For now, we trust the client (in production, verify the tx!)
 
-      // Calculate pricing
-      const tierConfig = SERVER_PRICING.tiers[tier as keyof typeof SERVER_PRICING.tiers];
-      const discount = SERVER_PRICING.durationDiscounts[duration as keyof typeof SERVER_PRICING.durationDiscounts] || 0;
-      const basePrice = tierConfig.price * duration;
+      // Calculate pricing (single tier)
+      const discount = SERVER_PRICING.durationDiscounts[duration] || 0;
+      const basePrice = SERVER_PRICING.price * duration;
       const totalPrice = basePrice - (basePrice * discount);
 
       // Generate IDs
@@ -468,7 +459,7 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         hasPassword: !!password,
         passwordHash,
         currentPlayers: 0,
-        maxPlayers: tierConfig.maxPlayers,
+        maxPlayers: SERVER_PRICING.maxPlayers,
         createdAt: now,
         expiresAt,
         txHash,
@@ -479,9 +470,9 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         id: rentalId,
         serverId,
         ownerId: ownerWallet.toLowerCase(),
-        tier: tier as ServerTier,
+        tier: 'standard' as ServerTier, // single tier
         duration,
-        pricePerMonth: tierConfig.price,
+        pricePerMonth: SERVER_PRICING.price,
         totalPrice,
         discount,
         txHash,
