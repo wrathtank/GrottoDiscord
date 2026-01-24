@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import { BlockchainService } from '../services/blockchain';
+import { createHetznerServer, deleteHetznerServer, isHetznerConfigured } from '../services/hetzner';
+import { verifyHeresyTransfer } from '../services/payment';
 import { BotConfig, GameServer, ServerRental, ServerTier, ServerStatus, CreateServerRequest } from '../types';
 import {
   getVerificationSession,
@@ -272,8 +274,9 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
 
   // Server pricing configuration
   // Single tier pricing - dedicated game server
+  // At $2500/HERESY, 0.005 HERESY = ~$12.50/month
   const SERVER_PRICING = {
-    price: 250, // HERESY per month
+    price: 0.005, // HERESY per month
     maxPlayers: 32,
     cpu: 2,
     ram: 4,
@@ -425,13 +428,28 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
-      // TODO: Verify transaction on-chain
-      // For now, we trust the client (in production, verify the tx!)
-
       // Calculate pricing (single tier)
       const discount = SERVER_PRICING.durationDiscounts[duration] || 0;
       const basePrice = SERVER_PRICING.price * duration;
       const totalPrice = basePrice - (basePrice * discount);
+
+      // Verify payment on-chain
+      const verification = await verifyHeresyTransfer(
+        txHash,
+        ownerWallet,
+        SERVER_PRICING.treasuryAddress,
+        totalPrice
+      );
+
+      if (!verification.verified) {
+        console.error(`[API] Payment verification failed: ${verification.error}`);
+        return res.status(400).json({
+          success: false,
+          error: verification.error || 'Payment verification failed',
+        });
+      }
+
+      console.log(`[API] Payment verified: ${verification.amount} HERESY`);
 
       // Generate IDs
       const serverId = 'srv-' + crypto.randomBytes(8).toString('hex');
@@ -483,19 +501,43 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       await createGameServer(server);
       await createServerRental(rental);
 
-      // In production: trigger server provisioning workflow here
-      // For now, simulate provisioning by setting to online after a delay
-      setTimeout(async () => {
-        try {
-          await updateGameServerStatus(serverId, 'online');
-          await updateRentalStatus(rentalId, 'confirmed');
-          console.log(`[API] Server ${serverId} provisioned successfully`);
-        } catch (err) {
-          console.error(`[API] Failed to update server status:`, err);
-        }
-      }, 5000);
+      // Provision server with Hetzner
+      console.log(`[API] Creating server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);
 
-      console.log(`[API] Created server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);
+      if (isHetznerConfigured()) {
+        // Auto-provision with Hetzner Cloud
+        (async () => {
+          try {
+            const result = await createHetznerServer(serverId, name, server.port);
+
+            if (result.success && result.ip) {
+              await updateGameServerStatus(serverId, 'online', result.ip);
+              await updateRentalStatus(rentalId, 'confirmed');
+              console.log(`[API] Server ${serverId} provisioned at ${result.ip}`);
+            } else {
+              await updateGameServerStatus(serverId, 'offline');
+              await updateRentalStatus(rentalId, 'failed');
+              console.error(`[API] Failed to provision ${serverId}: ${result.error}`);
+            }
+          } catch (err) {
+            console.error(`[API] Hetzner provisioning error:`, err);
+            await updateGameServerStatus(serverId, 'offline');
+            await updateRentalStatus(rentalId, 'failed');
+          }
+        })();
+      } else {
+        // Development mode - simulate provisioning
+        console.log(`[API] Hetzner not configured, simulating provisioning...`);
+        setTimeout(async () => {
+          try {
+            await updateGameServerStatus(serverId, 'online', `${serverId}.grotto.gg`);
+            await updateRentalStatus(rentalId, 'confirmed');
+            console.log(`[API] Server ${serverId} provisioned (simulated)`);
+          } catch (err) {
+            console.error(`[API] Failed to update server status:`, err);
+          }
+        }, 5000);
+      }
 
       return res.json({
         success: true,

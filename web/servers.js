@@ -3,7 +3,9 @@
 const GROTTO_CHAIN_ID = 36463;
 const GROTTO_RPC = 'https://rpc.grotto.network';
 const HERESY_TOKEN = '0xfa99b368b5fc1f5a061bc393dff73be8a097667d';
-const TREASURY = '0x000000000000000000000000000000000000dEaD'; // Update with real treasury
+
+// ⚠️ SET YOUR TREASURY WALLET ADDRESS HERE
+const TREASURY = '0x000000000000000000000000000000000000dEaD'; // <-- YOUR WALLET
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
@@ -15,7 +17,8 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)'
 ];
 
-const PRICE_PER_MONTH = 250;
+// Pricing: ~$12.50/month at $2500/HERESY = 0.005 HERESY
+const PRICE_PER_MONTH = 0.005;
 const DISCOUNTS = { 1: 0, 3: 0.10, 6: 0.15 };
 
 let provider, signer, walletAddress, heresyContract;
