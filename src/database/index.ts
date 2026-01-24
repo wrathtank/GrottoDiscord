@@ -551,6 +551,19 @@ export function updateServerHeartbeat(id: string, currentPlayers: number): void 
   markChanged();
 }
 
+export function updateServerMetadata(id: string, metadata: any): void {
+  db.run(
+    'UPDATE game_servers SET metadata = ? WHERE id = ?',
+    [JSON.stringify(metadata), id]
+  );
+  markChanged();
+}
+
+export function updateServerName(id: string, name: string): void {
+  db.run('UPDATE game_servers SET name = ? WHERE id = ?', [name, id]);
+  markChanged();
+}
+
 export function deleteGameServer(id: string): void {
   db.run('DELETE FROM game_servers WHERE id = ?', [id]);
   markChanged();

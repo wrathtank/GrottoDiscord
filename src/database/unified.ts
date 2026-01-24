@@ -177,6 +177,14 @@ export async function updateServerHeartbeat(id: string, currentPlayers: number):
   sqlite.updateServerHeartbeat(id, currentPlayers);
 }
 
+export async function updateServerMetadata(id: string, metadata: any): Promise<void> {
+  sqlite.updateServerMetadata(id, metadata);
+}
+
+export async function updateServerName(id: string, name: string): Promise<void> {
+  sqlite.updateServerName(id, name);
+}
+
 export async function deleteGameServer(id: string): Promise<void> {
   sqlite.deleteGameServer(id);
 }

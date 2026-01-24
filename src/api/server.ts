@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import { BlockchainService } from '../services/blockchain';
-import { createHetznerServer, deleteHetznerServer, isHetznerConfigured } from '../services/hetzner';
+import { createHetznerServer, deleteHetznerServer, isHetznerConfigured, generateApiKey } from '../services/hetzner';
 import { verifyHeresyTransfer } from '../services/payment';
 import { BotConfig, GameServer, ServerRental, ServerTier, ServerStatus, CreateServerRequest } from '../types';
 import {
@@ -454,6 +454,7 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       // Generate IDs
       const serverId = 'srv-' + crypto.randomBytes(8).toString('hex');
       const rentalId = 'rent-' + crypto.randomBytes(8).toString('hex');
+      const apiKey = generateApiKey();
 
       // Hash password if provided
       const passwordHash = password
@@ -463,6 +464,14 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       // Calculate expiry
       const now = Date.now();
       const expiresAt = now + (duration * 30 * 24 * 60 * 60 * 1000); // months to ms
+
+      // Default settings for the relay server
+      const defaultSettings = {
+        maxPlayersPerLobby: 16,
+        maxLobbies: 10,
+        allowPublicLobbies: true,
+        requireLobbyPasswords: false,
+      };
 
       // Create server record
       const server: GameServer = {
@@ -481,6 +490,10 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         createdAt: now,
         expiresAt,
         txHash,
+        metadata: {
+          apiKey,
+          settings: defaultSettings,
+        },
       };
 
       // Create rental record
@@ -508,7 +521,13 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         // Auto-provision with Hetzner Cloud
         (async () => {
           try {
-            const result = await createHetznerServer(serverId, name, server.port);
+            const result = await createHetznerServer(
+              serverId,
+              name,
+              server.port,
+              apiKey,
+              defaultSettings
+            );
 
             if (result.success && result.ip) {
               await updateGameServerStatus(serverId, 'online', result.ip);
@@ -751,6 +770,240 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     } catch (error) {
       console.error('[API] Delete game error:', error);
       return res.status(500).json({ success: false, error: 'Failed to delete' });
+    }
+  });
+
+  // ============================================
+  // Lobby Management Endpoints (for panel)
+  // ============================================
+
+  // Save server settings
+  app.post('/api/servers/:id/settings', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet, settings } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Update server settings in metadata
+      const metadata = {
+        ...(server.metadata || {}),
+        settings: {
+          maxPlayersPerLobby: Math.min(Math.max(settings.maxPlayersPerLobby || 16, 2), 32),
+          maxLobbies: Math.min(Math.max(settings.maxLobbies || 10, 1), 50),
+          allowPublicLobbies: settings.allowPublicLobbies !== false,
+          requireLobbyPasswords: settings.requireLobbyPasswords || false,
+        }
+      };
+
+      // Update server name if changed
+      const newName = settings.name?.slice(0, 32) || server.name;
+
+      // Update database
+      const { updateServerMetadata, updateServerName } = await import('../database/unified');
+      await updateServerMetadata(id, metadata);
+      if (newName !== server.name) {
+        await updateServerName(id, newName);
+      }
+
+      // If the server is online, push settings to relay server
+      if (server.status === 'online' && server.address) {
+        try {
+          // Update environment on the relay server
+          const envUpdate = `
+            MAX_LOBBIES=${metadata.settings.maxLobbies}
+            MAX_PLAYERS_PER_LOBBY=${metadata.settings.maxPlayersPerLobby}
+            ALLOW_PUBLIC_LOBBIES=${metadata.settings.allowPublicLobbies}
+            REQUIRE_LOBBY_PASSWORDS=${metadata.settings.requireLobbyPasswords}
+          `;
+          console.log(`[API] Would push settings to ${server.address}:`, metadata.settings);
+          // In production: SSH to server, update .env, restart container
+        } catch (e) {
+          console.error('[API] Failed to push settings to relay:', e);
+        }
+      }
+
+      console.log(`[API] Settings updated for ${id}:`, metadata.settings);
+
+      return res.json({ success: true, message: 'Settings saved' });
+    } catch (error) {
+      console.error('[API] Settings error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to save settings' });
+    }
+  });
+
+  // Get active lobbies from relay server
+  app.get('/api/servers/:id/lobbies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const server = await getGameServer(id);
+
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // If server is offline, return empty
+      if (server.status !== 'online' || !server.address) {
+        return res.json({ success: true, lobbies: [] });
+      }
+
+      // Fetch from relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/lobbies`;
+        const response = await fetch(relayUrl, { signal: AbortSignal.timeout(5000) });
+        const data = await response.json();
+
+        return res.json({
+          success: true,
+          lobbies: data.lobbies || [],
+        });
+      } catch (e) {
+        // Relay might be down or not responding
+        console.error(`[API] Failed to fetch lobbies from ${server.address}:`, e);
+        return res.json({ success: true, lobbies: [] });
+      }
+    } catch (error) {
+      console.error('[API] Lobbies error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to load lobbies' });
+    }
+  });
+
+  // Kick all players from all lobbies
+  app.post('/api/servers/:id/kick-all', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      if (server.status !== 'online' || !server.address) {
+        return res.json({ success: true, message: 'Server offline - no players to kick' });
+      }
+
+      // Send kick-all command to relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/admin/kick-all`;
+        const apiKey = server.metadata?.apiKey;
+
+        await fetch(relayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        console.log(`[API] Kicked all players from ${id}`);
+        return res.json({ success: true, message: 'All players kicked' });
+      } catch (e) {
+        console.error(`[API] Failed to kick all from ${server.address}:`, e);
+        return res.status(500).json({ success: false, error: 'Failed to kick players' });
+      }
+    } catch (error) {
+      console.error('[API] Kick all error:', error);
+      return res.status(500).json({ success: false, error: 'Operation failed' });
+    }
+  });
+
+  // Kick specific lobby
+  app.post('/api/servers/:id/lobbies/:lobbyId/kick', async (req: Request, res: Response) => {
+    try {
+      const { id, lobbyId } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server || server.status !== 'online' || !server.address) {
+        return res.status(404).json({ success: false, error: 'Server not available' });
+      }
+
+      // Send kick command to relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/lobbies/${lobbyId}/close`;
+        const apiKey = server.metadata?.apiKey;
+
+        await fetch(relayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        console.log(`[API] Kicked lobby ${lobbyId} from ${id}`);
+        return res.json({ success: true, message: 'Lobby kicked' });
+      } catch (e) {
+        console.error(`[API] Failed to kick lobby:`, e);
+        return res.status(500).json({ success: false, error: 'Failed to kick lobby' });
+      }
+    } catch (error) {
+      console.error('[API] Kick lobby error:', error);
+      return res.status(500).json({ success: false, error: 'Operation failed' });
+    }
+  });
+
+  // Regenerate API key
+  app.post('/api/servers/:id/regenerate-key', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Generate new API key
+      const newApiKey = generateApiKey();
+
+      // Update metadata
+      const metadata = {
+        ...(server.metadata || {}),
+        apiKey: newApiKey,
+      };
+
+      const { updateServerMetadata } = await import('../database/unified');
+      await updateServerMetadata(id, metadata);
+
+      // If server is online, update relay server with new key
+      if (server.status === 'online' && server.address) {
+        // In production: SSH to server, update .env with new API_KEY, restart container
+        console.log(`[API] Would update API key on ${server.address}`);
+      }
+
+      console.log(`[API] Regenerated API key for ${id}`);
+
+      return res.json({
+        success: true,
+        apiKey: newApiKey,
+        message: 'API key regenerated. Update your Unity projects with the new key.',
+      });
+    } catch (error) {
+      console.error('[API] Regenerate key error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to regenerate key' });
     }
   });
 

@@ -20,243 +20,189 @@
       <div class="server-status">
         <span id="status-badge" class="status offline">OFFLINE</span>
         <span id="player-count">0/32 players</span>
+        <span id="lobby-count">0 active lobbies</span>
       </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <button id="btn-start" class="btn-action btn-start" disabled>
-        <span class="icon">&#9654;</span> START
-      </button>
-      <button id="btn-stop" class="btn-action btn-stop" disabled>
-        <span class="icon">&#9632;</span> STOP
-      </button>
-      <button id="btn-restart" class="btn-action btn-restart" disabled>
-        <span class="icon">&#8635;</span> RESTART
-      </button>
-    </div>
-
-    <!-- Connection Info -->
-    <div class="panel-section connection-section">
-      <h2>CONNECTION INFO</h2>
-      <div class="connection-box">
-        <div class="conn-row">
-          <span class="label">Server Address</span>
-          <code id="conn-address">--</code>
-          <button class="btn-copy" onclick="copyToClipboard('conn-address')">Copy</button>
+    <!-- Connection Card -->
+    <div class="connection-card">
+      <h2>YOUR SERVER</h2>
+      <div class="connection-grid">
+        <div class="conn-item">
+          <span class="label">Server ID</span>
+          <code id="server-id">--</code>
+          <button class="btn-copy" data-copy="server-id">Copy</button>
         </div>
-        <div class="conn-row">
+        <div class="conn-item">
+          <span class="label">Address</span>
+          <code id="server-address">--</code>
+          <button class="btn-copy" data-copy="server-address">Copy</button>
+        </div>
+        <div class="conn-item">
           <span class="label">Port</span>
-          <code id="conn-port">7777</code>
+          <code id="server-port">7777</code>
         </div>
-        <div class="conn-row">
-          <span class="label">Full Address</span>
-          <code id="conn-full">--:7777</code>
-          <button class="btn-copy" onclick="copyToClipboard('conn-full')">Copy</button>
+        <div class="conn-item">
+          <span class="label">API Key</span>
+          <code id="api-key">••••••••</code>
+          <button class="btn-copy" data-copy="api-key">Copy</button>
+          <button id="btn-show-key" class="btn-small">Show</button>
         </div>
       </div>
-      <div class="unity-code">
-        <h3>Unity Client Code</h3>
-        <pre><code id="unity-snippet">// Add to your NetworkManager or connection script
-NetworkManager.singleton.networkAddress = "--";
-NetworkManager.singleton.networkPort = 7777;
-NetworkManager.singleton.StartClient();</code></pre>
-        <button class="btn-copy" onclick="copyCode()">Copy Code</button>
+      <div class="expires-info">
+        <span>Expires: <strong id="expires-date">--</strong></span>
+        <button id="btn-extend" class="btn-small">Extend</button>
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="panel-tabs">
-      <button class="tab active" data-tab="upload">UPLOAD GAME</button>
-      <button class="tab" data-tab="config">CONFIG</button>
-      <button class="tab" data-tab="logs">LOGS</button>
-      <button class="tab" data-tab="info">INFO</button>
-    </div>
-
-    <!-- Upload Tab -->
-    <div id="tab-upload" class="tab-content active">
-      <div class="upload-section">
-        <h2>UPLOAD YOUR GAME SERVER</h2>
-        <p class="help-text">Upload your Unity dedicated server build (.zip). The server should be built for Linux x64.</p>
-
-        <div class="upload-steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Build Your Server</h4>
-              <p>In Unity: File → Build Settings → Target Platform: Linux → Server Build ✓ → Build</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Zip the Build</h4>
-              <p>Zip the entire build folder (should contain your executable and _Data folder)</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Upload Here</h4>
-              <p>Upload the zip file below. Max size: 500MB</p>
-            </div>
+    <!-- Quick Setup -->
+    <div class="setup-card">
+      <h2>QUICK SETUP</h2>
+      <div class="setup-steps">
+        <div class="setup-step">
+          <span class="step-num">1</span>
+          <div>
+            <h4>Download Unity Package</h4>
+            <p>Import the Grotto SDK into your Unity project</p>
+            <a href="#" id="btn-download-sdk" class="btn-fire"><span>DOWNLOAD SDK</span></a>
           </div>
         </div>
-
-        <div class="upload-zone" id="upload-zone">
-          <input type="file" id="file-input" accept=".zip" hidden>
-          <div class="upload-icon">&#128230;</div>
-          <p>Drag & drop your server.zip here</p>
-          <p class="or">or</p>
-          <button class="btn-fire" onclick="document.getElementById('file-input').click()">
-            <span>BROWSE FILES</span>
-          </button>
-          <div id="upload-progress" class="upload-progress hidden">
-            <div class="progress-bar">
-              <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <span id="progress-text">0%</span>
+        <div class="setup-step">
+          <span class="step-num">2</span>
+          <div>
+            <h4>Add Your Server ID</h4>
+            <p>Paste your server ID into the GrottoManager component</p>
+            <code>ServerID: <span id="copy-server-id">--</span></code>
           </div>
         </div>
-
-        <div id="current-game" class="current-game hidden">
-          <h3>CURRENT GAME</h3>
-          <div class="game-info">
-            <span id="game-filename">game.zip</span>
-            <span id="game-size">0 MB</span>
-            <span id="game-uploaded">Uploaded: --</span>
+        <div class="setup-step">
+          <span class="step-num">3</span>
+          <div>
+            <h4>Done!</h4>
+            <p>Players can now host and join games through your server</p>
           </div>
-          <button id="btn-delete-game" class="btn-danger">DELETE</button>
         </div>
       </div>
     </div>
 
-    <!-- Config Tab -->
-    <div id="tab-config" class="tab-content hidden">
-      <div class="config-section">
-        <h2>SERVER CONFIGURATION</h2>
-
-        <div class="config-form">
-          <div class="config-row">
-            <label>Executable Name</label>
-            <input type="text" id="cfg-executable" placeholder="MyGame.x86_64" value="">
-            <span class="help">The main executable file in your build</span>
+    <!-- Settings -->
+    <div class="settings-card">
+      <h2>SERVER SETTINGS</h2>
+      <div class="settings-form">
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Server Name</label>
+            <span class="setting-help">Displayed in game lobby browser</span>
           </div>
-
-          <div class="config-row">
-            <label>Port</label>
-            <input type="number" id="cfg-port" value="7777" min="1024" max="65535">
-            <span class="help">Game server port (default: 7777)</span>
-          </div>
-
-          <div class="config-row">
-            <label>Max Players</label>
-            <input type="number" id="cfg-maxplayers" value="32" min="1" max="32">
-            <span class="help">Maximum concurrent players</span>
-          </div>
-
-          <div class="config-row">
-            <label>Launch Arguments</label>
-            <input type="text" id="cfg-args" placeholder="-batchmode -nographics">
-            <span class="help">Additional command line arguments</span>
-          </div>
-
-          <div class="config-row">
-            <label>Auto-Start</label>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-autostart" checked>
-              <span class="slider"></span>
-            </label>
-            <span class="help">Start server automatically after upload</span>
-          </div>
-
-          <button id="btn-save-config" class="btn-fire">
-            <span>SAVE CONFIG</span>
-          </button>
+          <input type="text" id="setting-name" maxlength="32">
         </div>
 
-        <div class="env-section">
-          <h3>ENVIRONMENT VARIABLES</h3>
-          <p class="help-text">Add custom environment variables for your game server</p>
-          <div id="env-list" class="env-list">
-            <!-- Populated by JS -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Max Players Per Lobby</label>
+            <span class="setting-help">Maximum players in a single game room</span>
           </div>
-          <button id="btn-add-env" class="btn-small">+ ADD VARIABLE</button>
+          <input type="number" id="setting-max-players" min="2" max="32" value="16">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Max Concurrent Lobbies</label>
+            <span class="setting-help">How many games can run at once</span>
+          </div>
+          <input type="number" id="setting-max-lobbies" min="1" max="50" value="10">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Server Password</label>
+            <span class="setting-help">Leave empty for public access</span>
+          </div>
+          <input type="password" id="setting-password" placeholder="Optional">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Allow Public Lobbies</label>
+            <span class="setting-help">Let players create visible lobbies</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-public-lobbies" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Require Lobby Passwords</label>
+            <span class="setting-help">Force all lobbies to have passwords</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-require-password">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <button id="btn-save-settings" class="btn-fire"><span>SAVE SETTINGS</span></button>
+      </div>
+    </div>
+
+    <!-- Active Lobbies -->
+    <div class="lobbies-card">
+      <h2>ACTIVE LOBBIES</h2>
+      <div id="lobbies-list" class="lobbies-list">
+        <p class="empty-state">No active lobbies</p>
+      </div>
+    </div>
+
+    <!-- Unity Code Preview -->
+    <div class="code-card">
+      <h2>UNITY INTEGRATION</h2>
+      <div class="code-tabs">
+        <button class="code-tab active" data-code="host">Host Game</button>
+        <button class="code-tab" data-code="join">Join Game</button>
+        <button class="code-tab" data-code="list">List Lobbies</button>
+      </div>
+      <pre class="code-block"><code id="code-preview">// Host a new game
+GrottoNetwork.HostLobby("My Lobby", maxPlayers: 8, isPublic: true);
+
+// Called when hosting succeeds
+GrottoNetwork.OnLobbyCreated += (lobby) => {
+    Debug.Log($"Lobby created: {lobby.Code}");
+    // Start your game scene
+    SceneManager.LoadScene("GameScene");
+};
+
+// Called when a player joins your lobby
+GrottoNetwork.OnPlayerJoined += (player) => {
+    Debug.Log($"{player.Name} joined!");
+};</code></pre>
+      <button class="btn-copy-code">Copy Code</button>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-card">
+      <h2>DANGER ZONE</h2>
+      <div class="danger-actions">
+        <div class="danger-item">
+          <div>
+            <strong>Kick All Players</strong>
+            <p>Disconnect everyone from all lobbies</p>
+          </div>
+          <button id="btn-kick-all" class="btn-danger">KICK ALL</button>
+        </div>
+        <div class="danger-item">
+          <div>
+            <strong>Regenerate API Key</strong>
+            <p>Invalidate current key and generate new one</p>
+          </div>
+          <button id="btn-regen-key" class="btn-danger">REGENERATE</button>
         </div>
       </div>
     </div>
 
-    <!-- Logs Tab -->
-    <div id="tab-logs" class="tab-content hidden">
-      <div class="logs-section">
-        <div class="logs-header">
-          <h2>SERVER LOGS</h2>
-          <div class="logs-actions">
-            <label class="toggle-label">
-              <input type="checkbox" id="log-autoscroll" checked>
-              Auto-scroll
-            </label>
-            <button id="btn-clear-logs" class="btn-small">CLEAR</button>
-            <button id="btn-download-logs" class="btn-small">DOWNLOAD</button>
-          </div>
-        </div>
-        <div id="log-output" class="log-output">
-          <div class="log-empty">No logs yet. Start your server to see output.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Info Tab -->
-    <div id="tab-info" class="tab-content hidden">
-      <div class="info-section">
-        <h2>SERVER INFORMATION</h2>
-
-        <div class="info-grid">
-          <div class="info-card">
-            <span class="info-label">Server ID</span>
-            <span id="info-id" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Game Name</span>
-            <span id="info-game" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Status</span>
-            <span id="info-status" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">IP Address</span>
-            <span id="info-ip" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Created</span>
-            <span id="info-created" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Expires</span>
-            <span id="info-expires" class="info-value">--</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Tier</span>
-            <span id="info-tier" class="info-value">Standard</span>
-          </div>
-          <div class="info-card">
-            <span class="info-label">Resources</span>
-            <span id="info-resources" class="info-value">2 vCPU / 4GB RAM</span>
-          </div>
-        </div>
-
-        <div class="danger-zone">
-          <h3>DANGER ZONE</h3>
-          <button id="btn-factory-reset" class="btn-danger">FACTORY RESET</button>
-          <p class="help-text">Wipe all game files and reset to default state</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer -->
     <div class="panel-footer">
-      <span>Grotto Servers &bull; Need help? <a href="https://discord.gg/grotto" target="_blank">Join Discord</a></span>
+      <span>Grotto Servers &bull; <a href="https://discord.gg/grotto" target="_blank">Discord</a> &bull; <a href="#" id="link-docs">Documentation</a></span>
     </div>
   </div>
 
