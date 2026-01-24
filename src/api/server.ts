@@ -1,12 +1,21 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import { BlockchainService } from '../services/blockchain';
-import { BotConfig } from '../types';
+import { BotConfig, GameServer, ServerRental, ServerTier, ServerStatus, CreateServerRequest } from '../types';
 import {
   getVerificationSession,
   deleteVerificationSession,
   linkWallet,
   getWalletByAddress,
+  createGameServer,
+  getGameServer,
+  getGameServersByOwner,
+  getAllGameServers,
+  updateGameServerStatus,
+  createServerRental,
+  getRentalByTxHash,
+  updateRentalStatus,
 } from '../database/unified';
 import { Client, EmbedBuilder } from 'discord.js';
 
@@ -254,6 +263,300 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         success: false,
         error: 'Internal server error. Please try again.',
       });
+    }
+  });
+
+  // ============================================
+  // Game Server Rental Endpoints
+  // ============================================
+
+  // Server pricing configuration
+  const SERVER_PRICING = {
+    tiers: {
+      basic: { name: 'Basic', price: 100, maxPlayers: 10, cpu: 1, ram: 1 },
+      standard: { name: 'Standard', price: 250, maxPlayers: 25, cpu: 2, ram: 2 },
+      premium: { name: 'Premium', price: 500, maxPlayers: 50, cpu: 4, ram: 4 },
+    },
+    durationDiscounts: { 1: 0, 3: 0.10, 6: 0.15, 12: 0.20 },
+    treasuryAddress: process.env.TREASURY_ADDRESS || '0x000000000000000000000000000000000000dEaD',
+  };
+
+  // Get server pricing info
+  app.get('/api/servers/pricing', (req: Request, res: Response) => {
+    res.json({
+      success: true,
+      pricing: SERVER_PRICING,
+    });
+  });
+
+  // List all public game servers
+  app.get('/api/servers', async (req: Request, res: Response) => {
+    try {
+      const status = req.query.status as ServerStatus | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const servers = await getAllGameServers(status, limit, offset);
+
+      // Filter out sensitive data (password hashes) for public listing
+      const publicServers = servers.map(s => ({
+        id: s.id,
+        name: s.name,
+        gameName: s.gameName,
+        owner: s.ownerId.slice(0, 6) + '...' + s.ownerId.slice(-4),
+        tier: s.tier,
+        status: s.status,
+        address: s.status === 'online' ? s.address : null,
+        port: s.port,
+        hasPassword: s.hasPassword,
+        currentPlayers: s.currentPlayers,
+        maxPlayers: s.maxPlayers,
+        createdAt: s.createdAt,
+      }));
+
+      return res.json({
+        success: true,
+        servers: publicServers,
+        total: publicServers.length,
+      });
+    } catch (error) {
+      console.error('[API] List servers error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load servers.',
+      });
+    }
+  });
+
+  // Get servers owned by a wallet
+  app.get('/api/servers/my', async (req: Request, res: Response) => {
+    try {
+      const wallet = req.query.wallet as string;
+
+      if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid wallet address.',
+        });
+      }
+
+      const servers = await getGameServersByOwner(wallet);
+
+      return res.json({
+        success: true,
+        servers: servers.map(s => ({
+          ...s,
+          passwordHash: undefined, // Don't expose password hash
+        })),
+      });
+    } catch (error) {
+      console.error('[API] My servers error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load your servers.',
+      });
+    }
+  });
+
+  // Get single server details
+  app.get('/api/servers/:id', async (req: Request, res: Response) => {
+    try {
+      const server = await getGameServer(req.params.id);
+
+      if (!server) {
+        return res.status(404).json({
+          success: false,
+          error: 'Server not found.',
+        });
+      }
+
+      return res.json({
+        success: true,
+        server: {
+          ...server,
+          passwordHash: undefined,
+          owner: server.ownerId.slice(0, 6) + '...' + server.ownerId.slice(-4),
+        },
+      });
+    } catch (error) {
+      console.error('[API] Get server error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load server details.',
+      });
+    }
+  });
+
+  // Create a new server rental
+  app.post('/api/servers/create', async (req: Request, res: Response) => {
+    try {
+      const { name, gameName, password, tier, duration, ownerWallet, txHash } = req.body as CreateServerRequest;
+
+      // Validate required fields
+      if (!name || !gameName || !tier || !duration || !ownerWallet || !txHash) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields.',
+        });
+      }
+
+      // Validate tier
+      if (!['basic', 'standard', 'premium'].includes(tier)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid server tier.',
+        });
+      }
+
+      // Validate duration
+      if (![1, 3, 6, 12].includes(duration)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid rental duration.',
+        });
+      }
+
+      // Validate wallet address
+      if (!/^0x[a-fA-F0-9]{40}$/.test(ownerWallet)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid wallet address.',
+        });
+      }
+
+      // Check if txHash already used
+      const existingRental = await getRentalByTxHash(txHash);
+      if (existingRental) {
+        return res.status(400).json({
+          success: false,
+          error: 'Transaction already processed.',
+        });
+      }
+
+      // TODO: Verify transaction on-chain
+      // For now, we trust the client (in production, verify the tx!)
+
+      // Calculate pricing
+      const tierConfig = SERVER_PRICING.tiers[tier as keyof typeof SERVER_PRICING.tiers];
+      const discount = SERVER_PRICING.durationDiscounts[duration as keyof typeof SERVER_PRICING.durationDiscounts] || 0;
+      const basePrice = tierConfig.price * duration;
+      const totalPrice = basePrice - (basePrice * discount);
+
+      // Generate IDs
+      const serverId = 'srv-' + crypto.randomBytes(8).toString('hex');
+      const rentalId = 'rent-' + crypto.randomBytes(8).toString('hex');
+
+      // Hash password if provided
+      const passwordHash = password
+        ? crypto.createHash('sha256').update(password).digest('hex')
+        : undefined;
+
+      // Calculate expiry
+      const now = Date.now();
+      const expiresAt = now + (duration * 30 * 24 * 60 * 60 * 1000); // months to ms
+
+      // Create server record
+      const server: GameServer = {
+        id: serverId,
+        name: name.slice(0, 32),
+        gameName: gameName.slice(0, 64),
+        ownerId: ownerWallet.toLowerCase(),
+        tier: tier as ServerTier,
+        status: 'provisioning',
+        address: `${serverId}.grotto.gg`,
+        port: 7777,
+        hasPassword: !!password,
+        passwordHash,
+        currentPlayers: 0,
+        maxPlayers: tierConfig.maxPlayers,
+        createdAt: now,
+        expiresAt,
+        txHash,
+      };
+
+      // Create rental record
+      const rental: ServerRental = {
+        id: rentalId,
+        serverId,
+        ownerId: ownerWallet.toLowerCase(),
+        tier: tier as ServerTier,
+        duration,
+        pricePerMonth: tierConfig.price,
+        totalPrice,
+        discount,
+        txHash,
+        status: 'pending',
+        createdAt: now,
+      };
+
+      await createGameServer(server);
+      await createServerRental(rental);
+
+      // In production: trigger server provisioning workflow here
+      // For now, simulate provisioning by setting to online after a delay
+      setTimeout(async () => {
+        try {
+          await updateGameServerStatus(serverId, 'online');
+          await updateRentalStatus(rentalId, 'confirmed');
+          console.log(`[API] Server ${serverId} provisioned successfully`);
+        } catch (err) {
+          console.error(`[API] Failed to update server status:`, err);
+        }
+      }, 5000);
+
+      console.log(`[API] Created server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);
+
+      return res.json({
+        success: true,
+        message: 'Server rental initiated! Your server is being provisioned.',
+        server: {
+          id: serverId,
+          name: server.name,
+          gameName: server.gameName,
+          tier: server.tier,
+          status: server.status,
+          address: server.address,
+          port: server.port,
+          maxPlayers: server.maxPlayers,
+          expiresAt: server.expiresAt,
+        },
+        rental: {
+          id: rentalId,
+          duration,
+          totalPrice,
+          discount: discount * 100 + '%',
+        },
+      });
+    } catch (error) {
+      console.error('[API] Create server error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create server. Please try again.',
+      });
+    }
+  });
+
+  // Server heartbeat endpoint (for game servers to report status)
+  app.post('/api/servers/:id/heartbeat', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { currentPlayers, secret } = req.body;
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found.' });
+      }
+
+      // TODO: Validate secret/auth token
+      // For now, just update the heartbeat
+
+      const { updateServerHeartbeat } = await import('../database/unified');
+      await updateServerHeartbeat(id, currentPlayers || 0);
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('[API] Heartbeat error:', error);
+      return res.status(500).json({ success: false, error: 'Heartbeat failed.' });
     }
   });
 
