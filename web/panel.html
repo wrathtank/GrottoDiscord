@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Panel - Grotto Servers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div id="particles"></div>
+
+  <div class="panel-container">
+    <!-- Header -->
+    <div class="panel-header">
+      <a href="/servers" class="back-link">&larr; Back to Servers</a>
+      <h1 id="server-name">Loading...</h1>
+      <div class="server-status">
+        <span id="status-badge" class="status offline">OFFLINE</span>
+        <span id="player-count">0/32 players</span>
+        <span id="lobby-count">0 active lobbies</span>
+      </div>
+    </div>
+
+    <!-- Connection Card -->
+    <div class="connection-card">
+      <h2>YOUR SERVER</h2>
+      <div class="connection-grid">
+        <div class="conn-item">
+          <span class="label">Server ID</span>
+          <code id="server-id">--</code>
+          <button class="btn-copy" data-copy="server-id">Copy</button>
+        </div>
+        <div class="conn-item">
+          <span class="label">Address</span>
+          <code id="server-address">--</code>
+          <button class="btn-copy" data-copy="server-address">Copy</button>
+        </div>
+        <div class="conn-item">
+          <span class="label">Port</span>
+          <code id="server-port">7777</code>
+        </div>
+        <div class="conn-item">
+          <span class="label">API Key</span>
+          <code id="api-key">••••••••</code>
+          <button class="btn-copy" data-copy="api-key">Copy</button>
+          <button id="btn-show-key" class="btn-small">Show</button>
+        </div>
+      </div>
+      <div class="expires-info">
+        <span>Expires: <strong id="expires-date">--</strong></span>
+        <button id="btn-extend" class="btn-small">Extend</button>
+      </div>
+    </div>
+
+    <!-- Quick Setup -->
+    <div class="setup-card">
+      <h2>QUICK SETUP</h2>
+      <div class="setup-steps">
+        <div class="setup-step">
+          <span class="step-num">1</span>
+          <div>
+            <h4>Download Unity Package</h4>
+            <p>Import the Grotto SDK into your Unity project</p>
+            <a href="#" id="btn-download-sdk" class="btn-fire"><span>DOWNLOAD SDK</span></a>
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-num">2</span>
+          <div>
+            <h4>Add Your Server ID</h4>
+            <p>Paste your server ID into the GrottoManager component</p>
+            <code>ServerID: <span id="copy-server-id">--</span></code>
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-num">3</span>
+          <div>
+            <h4>Done!</h4>
+            <p>Players can now host and join games through your server</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings-card">
+      <h2>SERVER SETTINGS</h2>
+      <div class="settings-form">
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Server Name</label>
+            <span class="setting-help">Displayed in game lobby browser</span>
+          </div>
+          <input type="text" id="setting-name" maxlength="32">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Max Players Per Lobby</label>
+            <span class="setting-help">Maximum players in a single game room</span>
+          </div>
+          <input type="number" id="setting-max-players" min="2" max="32" value="16">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Max Concurrent Lobbies</label>
+            <span class="setting-help">How many games can run at once</span>
+          </div>
+          <input type="number" id="setting-max-lobbies" min="1" max="50" value="10">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Server Password</label>
+            <span class="setting-help">Leave empty for public access</span>
+          </div>
+          <input type="password" id="setting-password" placeholder="Optional">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Allow Public Lobbies</label>
+            <span class="setting-help">Let players create visible lobbies</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-public-lobbies" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label>Require Lobby Passwords</label>
+            <span class="setting-help">Force all lobbies to have passwords</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-require-password">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <button id="btn-save-settings" class="btn-fire"><span>SAVE SETTINGS</span></button>
+      </div>
+    </div>
+
+    <!-- Active Lobbies -->
+    <div class="lobbies-card">
+      <h2>ACTIVE LOBBIES</h2>
+      <div id="lobbies-list" class="lobbies-list">
+        <p class="empty-state">No active lobbies</p>
+      </div>
+    </div>
+
+    <!-- Unity Code Preview -->
+    <div class="code-card">
+      <h2>UNITY INTEGRATION</h2>
+      <div class="code-tabs">
+        <button class="code-tab active" data-code="host">Host Game</button>
+        <button class="code-tab" data-code="join">Join Game</button>
+        <button class="code-tab" data-code="list">List Lobbies</button>
+      </div>
+      <pre class="code-block"><code id="code-preview">// Host a new game
+GrottoNetwork.HostLobby("My Lobby", maxPlayers: 8, isPublic: true);
+
+// Called when hosting succeeds
+GrottoNetwork.OnLobbyCreated += (lobby) => {
+    Debug.Log($"Lobby created: {lobby.Code}");
+    // Start your game scene
+    SceneManager.LoadScene("GameScene");
+};
+
+// Called when a player joins your lobby
+GrottoNetwork.OnPlayerJoined += (player) => {
+    Debug.Log($"{player.Name} joined!");
+};</code></pre>
+      <button class="btn-copy-code">Copy Code</button>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-card">
+      <h2>DANGER ZONE</h2>
+      <div class="danger-actions">
+        <div class="danger-item">
+          <div>
+            <strong>Kick All Players</strong>
+            <p>Disconnect everyone from all lobbies</p>
+          </div>
+          <button id="btn-kick-all" class="btn-danger">KICK ALL</button>
+        </div>
+        <div class="danger-item">
+          <div>
+            <strong>Regenerate API Key</strong>
+            <p>Invalidate current key and generate new one</p>
+          </div>
+          <button id="btn-regen-key" class="btn-danger">REGENERATE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-footer">
+      <span>Grotto Servers &bull; <a href="https://discord.gg/grotto" target="_blank">Discord</a> &bull; <a href="#" id="link-docs">Documentation</a></span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

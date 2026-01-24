@@ -1,0 +1,471 @@
+/* Grotto Server Panel - Cookie Cutter Interface */
+
+.panel-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.panel-header {
+  margin-bottom: 25px;
+}
+
+.back-link {
+  font-size: 0.6rem;
+  color: #888;
+  text-decoration: none;
+}
+
+.back-link:hover { color: var(--red); }
+
+.panel-header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.5rem;
+  color: #fff;
+  margin: 10px 0;
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.status {
+  font-size: 0.5rem;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+.status.online { background: rgba(0,255,0,0.2); color: #0f0; }
+.status.offline { background: rgba(255,0,0,0.2); color: #f00; }
+.status.provisioning { background: rgba(255,165,0,0.2); color: #ffa500; }
+
+#player-count, #lobby-count {
+  font-size: 0.55rem;
+  color: #888;
+}
+
+.ownership-warning {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255,165,0,0.1);
+  border: 1px solid #ffa500;
+  border-radius: 5px;
+  font-size: 0.55rem;
+  color: #ffa500;
+}
+
+/* Cards */
+.connection-card,
+.setup-card,
+.settings-card,
+.lobbies-card,
+.code-card,
+.danger-card {
+  background: rgba(30,30,30,0.9);
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.connection-card h2,
+.setup-card h2,
+.settings-card h2,
+.lobbies-card h2,
+.code-card h2,
+.danger-card h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  color: var(--red);
+  margin: 0 0 15px 0;
+}
+
+/* Connection Card */
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.conn-item {
+  background: rgba(0,0,0,0.3);
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.conn-item .label {
+  display: block;
+  font-size: 0.5rem;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.conn-item code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: #0f0;
+  display: block;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.btn-copy, .btn-small {
+  padding: 4px 10px;
+  font-size: 0.45rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #888;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.btn-copy:hover, .btn-small:hover {
+  border-color: #666;
+  color: #fff;
+}
+
+.expires-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #333;
+  font-size: 0.6rem;
+  color: #888;
+}
+
+.expires-info strong { color: #fff; }
+
+/* Setup Card */
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setup-step {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 32px;
+  height: 32px;
+  background: var(--red);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.setup-step h4 {
+  font-size: 0.7rem;
+  color: #fff;
+  margin: 0 0 5px 0;
+}
+
+.setup-step p {
+  font-size: 0.55rem;
+  color: #888;
+  margin: 0 0 10px 0;
+}
+
+.setup-step code {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  background: rgba(0,0,0,0.4);
+  padding: 6px 12px;
+  border-radius: 4px;
+  color: #0f0;
+}
+
+/* Settings Card */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.setting-info {
+  flex: 1;
+}
+
+.setting-info label {
+  display: block;
+  font-size: 0.65rem;
+  color: #fff;
+  margin-bottom: 3px;
+}
+
+.setting-help {
+  font-size: 0.5rem;
+  color: #666;
+}
+
+.setting-row input[type="text"],
+.setting-row input[type="number"],
+.setting-row input[type="password"] {
+  width: 150px;
+  padding: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: #fff;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid #444;
+  border-radius: 5px;
+}
+
+.setting-row input:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+/* Toggle */
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle input { display: none; }
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background: #333;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: #888;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle input:checked + .slider { background: var(--red); }
+.toggle input:checked + .slider::before {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+/* Lobbies */
+.lobbies-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.lobby-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.lobby-info { flex: 1; }
+
+.lobby-name {
+  font-size: 0.65rem;
+  color: #fff;
+  display: block;
+}
+
+.lobby-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: #888;
+}
+
+.lobby-players {
+  font-size: 0.6rem;
+  color: #0f0;
+}
+
+.btn-kick-lobby {
+  padding: 4px 10px;
+  font-size: 0.45rem;
+  background: rgba(255,0,0,0.1);
+  border: 1px solid #f44;
+  border-radius: 3px;
+  color: #f44;
+  cursor: pointer;
+}
+
+/* Code Card */
+.code-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.code-tab {
+  padding: 8px 15px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  color: #666;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.code-tab:hover { color: #aaa; }
+.code-tab.active { color: var(--red); border-color: var(--red); }
+
+.code-block {
+  background: #0a0a0a;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 15px;
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.code-block code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: #0f0;
+  white-space: pre;
+}
+
+.btn-copy-code {
+  padding: 8px 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  color: #888;
+  background: transparent;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-copy-code:hover { color: #fff; border-color: #666; }
+
+/* Danger Card */
+.danger-card {
+  border-color: rgba(255,0,0,0.3);
+}
+
+.danger-card h2 { color: #f44; }
+
+.danger-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.danger-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: rgba(255,0,0,0.05);
+  border-radius: 6px;
+}
+
+.danger-item strong {
+  font-size: 0.6rem;
+  color: #fff;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.danger-item p {
+  font-size: 0.5rem;
+  color: #888;
+  margin: 0;
+}
+
+.btn-danger {
+  padding: 8px 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  color: #f44;
+  background: transparent;
+  border: 1px solid #f44;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-danger:hover { background: rgba(255,0,0,0.1); }
+.btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Footer */
+.panel-footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 0.5rem;
+  color: #555;
+}
+
+.panel-footer a { color: var(--red); text-decoration: none; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  padding: 12px 25px;
+  border-radius: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  z-index: 1000;
+  opacity: 0;
+  transition: all 0.3s;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.toast-success { background: rgba(0,255,0,0.2); border: 1px solid #0f0; color: #0f0; }
+.toast-error { background: rgba(255,0,0,0.2); border: 1px solid #f00; color: #f00; }
+.toast-info { background: rgba(0,150,255,0.2); border: 1px solid #09f; color: #09f; }
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+  font-size: 0.6rem;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .connection-grid { grid-template-columns: 1fr; }
+  .setting-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .setting-row input { width: 100%; }
+  .danger-item { flex-direction: column; gap: 10px; text-align: center; }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "gg.grotto.networking",
+  "version": "1.0.0",
+  "displayName": "Grotto Networking",
+  "description": "Drop-in multiplayer solution for Unity games. Host and join lobbies with ease.",
+  "unity": "2020.3",
+  "documentationUrl": "https://docs.grotto.gg/unity-sdk",
+  "changelogUrl": "https://docs.grotto.gg/unity-sdk/changelog",
+  "licensesUrl": "https://grotto.gg/license",
+  "keywords": [
+    "networking",
+    "multiplayer",
+    "lobby",
+    "matchmaking",
+    "grotto"
+  ],
+  "author": {
+    "name": "Grotto",
+    "url": "https://grotto.gg"
+  },
+  "dependencies": {
+    "com.unity.textmeshpro": "3.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Lobby Browser UI",
+      "description": "Pre-built lobby browser with host/join functionality",
+      "path": "Samples~/LobbyBrowser"
+    }
+  ]
+}

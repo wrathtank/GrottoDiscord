@@ -12,6 +12,10 @@
       "dest": "/servers.html"
     },
     {
+      "src": "/panel",
+      "dest": "/panel.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }

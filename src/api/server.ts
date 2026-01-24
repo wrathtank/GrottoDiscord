@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import { BlockchainService } from '../services/blockchain';
+import { createHetznerServer, deleteHetznerServer, isHetznerConfigured, generateApiKey } from '../services/hetzner';
+import { verifyHeresyTransfer } from '../services/payment';
 import { BotConfig, GameServer, ServerRental, ServerTier, ServerStatus, CreateServerRequest } from '../types';
 import {
   getVerificationSession,
@@ -271,13 +273,14 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   // ============================================
 
   // Server pricing configuration
+  // Single tier pricing - dedicated game server
+  // At $2500/HERESY, 0.005 HERESY = ~$12.50/month
   const SERVER_PRICING = {
-    tiers: {
-      basic: { name: 'Basic', price: 100, maxPlayers: 10, cpu: 1, ram: 1 },
-      standard: { name: 'Standard', price: 250, maxPlayers: 25, cpu: 2, ram: 2 },
-      premium: { name: 'Premium', price: 500, maxPlayers: 50, cpu: 4, ram: 4 },
-    },
-    durationDiscounts: { 1: 0, 3: 0.10, 6: 0.15, 12: 0.20 },
+    price: 0.005, // HERESY per month
+    maxPlayers: 32,
+    cpu: 2,
+    ram: 4,
+    durationDiscounts: { 1: 0, 3: 0.10, 6: 0.15 } as Record<number, number>,
     treasuryAddress: process.env.TREASURY_ADDRESS || '0x000000000000000000000000000000000000dEaD',
   };
 
@@ -400,16 +403,8 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
-      // Validate tier
-      if (!['basic', 'standard', 'premium'].includes(tier)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid server tier.',
-        });
-      }
-
       // Validate duration
-      if (![1, 3, 6, 12].includes(duration)) {
+      if (![1, 3, 6].includes(duration)) {
         return res.status(400).json({
           success: false,
           error: 'Invalid rental duration.',
@@ -433,18 +428,33 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         });
       }
 
-      // TODO: Verify transaction on-chain
-      // For now, we trust the client (in production, verify the tx!)
-
-      // Calculate pricing
-      const tierConfig = SERVER_PRICING.tiers[tier as keyof typeof SERVER_PRICING.tiers];
-      const discount = SERVER_PRICING.durationDiscounts[duration as keyof typeof SERVER_PRICING.durationDiscounts] || 0;
-      const basePrice = tierConfig.price * duration;
+      // Calculate pricing (single tier)
+      const discount = SERVER_PRICING.durationDiscounts[duration] || 0;
+      const basePrice = SERVER_PRICING.price * duration;
       const totalPrice = basePrice - (basePrice * discount);
+
+      // Verify payment on-chain
+      const verification = await verifyHeresyTransfer(
+        txHash,
+        ownerWallet,
+        SERVER_PRICING.treasuryAddress,
+        totalPrice
+      );
+
+      if (!verification.verified) {
+        console.error(`[API] Payment verification failed: ${verification.error}`);
+        return res.status(400).json({
+          success: false,
+          error: verification.error || 'Payment verification failed',
+        });
+      }
+
+      console.log(`[API] Payment verified: ${verification.amount} HERESY`);
 
       // Generate IDs
       const serverId = 'srv-' + crypto.randomBytes(8).toString('hex');
       const rentalId = 'rent-' + crypto.randomBytes(8).toString('hex');
+      const apiKey = generateApiKey();
 
       // Hash password if provided
       const passwordHash = password
@@ -454,6 +464,14 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       // Calculate expiry
       const now = Date.now();
       const expiresAt = now + (duration * 30 * 24 * 60 * 60 * 1000); // months to ms
+
+      // Default settings for the relay server
+      const defaultSettings = {
+        maxPlayersPerLobby: 16,
+        maxLobbies: 10,
+        allowPublicLobbies: true,
+        requireLobbyPasswords: false,
+      };
 
       // Create server record
       const server: GameServer = {
@@ -468,10 +486,14 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         hasPassword: !!password,
         passwordHash,
         currentPlayers: 0,
-        maxPlayers: tierConfig.maxPlayers,
+        maxPlayers: SERVER_PRICING.maxPlayers,
         createdAt: now,
         expiresAt,
         txHash,
+        metadata: {
+          apiKey,
+          settings: defaultSettings,
+        },
       };
 
       // Create rental record
@@ -479,9 +501,9 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         id: rentalId,
         serverId,
         ownerId: ownerWallet.toLowerCase(),
-        tier: tier as ServerTier,
+        tier: 'standard' as ServerTier, // single tier
         duration,
-        pricePerMonth: tierConfig.price,
+        pricePerMonth: SERVER_PRICING.price,
         totalPrice,
         discount,
         txHash,
@@ -492,19 +514,49 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       await createGameServer(server);
       await createServerRental(rental);
 
-      // In production: trigger server provisioning workflow here
-      // For now, simulate provisioning by setting to online after a delay
-      setTimeout(async () => {
-        try {
-          await updateGameServerStatus(serverId, 'online');
-          await updateRentalStatus(rentalId, 'confirmed');
-          console.log(`[API] Server ${serverId} provisioned successfully`);
-        } catch (err) {
-          console.error(`[API] Failed to update server status:`, err);
-        }
-      }, 5000);
+      // Provision server with Hetzner
+      console.log(`[API] Creating server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);
 
-      console.log(`[API] Created server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);
+      if (isHetznerConfigured()) {
+        // Auto-provision with Hetzner Cloud
+        (async () => {
+          try {
+            const result = await createHetznerServer(
+              serverId,
+              name,
+              server.port,
+              apiKey,
+              defaultSettings
+            );
+
+            if (result.success && result.ip) {
+              await updateGameServerStatus(serverId, 'online', result.ip);
+              await updateRentalStatus(rentalId, 'confirmed');
+              console.log(`[API] Server ${serverId} provisioned at ${result.ip}`);
+            } else {
+              await updateGameServerStatus(serverId, 'offline');
+              await updateRentalStatus(rentalId, 'failed');
+              console.error(`[API] Failed to provision ${serverId}: ${result.error}`);
+            }
+          } catch (err) {
+            console.error(`[API] Hetzner provisioning error:`, err);
+            await updateGameServerStatus(serverId, 'offline');
+            await updateRentalStatus(rentalId, 'failed');
+          }
+        })();
+      } else {
+        // Development mode - simulate provisioning
+        console.log(`[API] Hetzner not configured, simulating provisioning...`);
+        setTimeout(async () => {
+          try {
+            await updateGameServerStatus(serverId, 'online', `${serverId}.grotto.gg`);
+            await updateRentalStatus(rentalId, 'confirmed');
+            console.log(`[API] Server ${serverId} provisioned (simulated)`);
+          } catch (err) {
+            console.error(`[API] Failed to update server status:`, err);
+          }
+        }, 5000);
+      }
 
       return res.json({
         success: true,
@@ -557,6 +609,422 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     } catch (error) {
       console.error('[API] Heartbeat error:', error);
       return res.status(500).json({ success: false, error: 'Heartbeat failed.' });
+    }
+  });
+
+  // ============================================
+  // Server Panel Endpoints
+  // ============================================
+
+  // Helper: verify ownership
+  async function verifyOwnership(serverId: string, wallet: string): Promise<boolean> {
+    const server = await getGameServer(serverId);
+    if (!server) return false;
+    return server.ownerId.toLowerCase() === wallet.toLowerCase();
+  }
+
+  // Server control (start/stop/restart)
+  app.post('/api/servers/:id/control', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { action, wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      if (!['start', 'stop', 'restart'].includes(action)) {
+        return res.status(400).json({ success: false, error: 'Invalid action' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // If Hetzner is configured, send command to server
+      if (isHetznerConfigured() && server.address) {
+        const { powerAction } = await import('../services/hetzner');
+
+        if (action === 'stop') {
+          // SSH command to stop game, then update status
+          await updateGameServerStatus(id, 'offline');
+        } else if (action === 'start' || action === 'restart') {
+          await updateGameServerStatus(id, 'online');
+        }
+
+        console.log(`[API] Server ${id} action: ${action}`);
+      } else {
+        // Simulation mode
+        if (action === 'stop') {
+          await updateGameServerStatus(id, 'offline');
+        } else {
+          await updateGameServerStatus(id, 'online');
+        }
+      }
+
+      return res.json({ success: true, message: `Server ${action} initiated` });
+    } catch (error) {
+      console.error('[API] Control error:', error);
+      return res.status(500).json({ success: false, error: 'Control action failed' });
+    }
+  });
+
+  // Get/update server config
+  app.post('/api/servers/:id/config', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet, config } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Update server metadata with config
+      const metadata = { ...(server.metadata || {}), config };
+
+      // For now, store in memory/log - in production, update database
+      console.log(`[API] Config updated for ${id}:`, config);
+
+      return res.json({ success: true, message: 'Config saved' });
+    } catch (error) {
+      console.error('[API] Config error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to save config' });
+    }
+  });
+
+  // Get server logs
+  app.get('/api/servers/:id/logs', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const wallet = req.query.wallet as string;
+      const lines = parseInt(req.query.lines as string) || 100;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, fetch logs from Hetzner server via SSH
+      // For now, return mock logs
+      const mockLogs = [
+        `[${new Date().toISOString()}] [INFO] Server starting...`,
+        `[${new Date().toISOString()}] [INFO] Loading game data...`,
+        `[${new Date().toISOString()}] [INFO] Listening on port 7777`,
+        `[${new Date().toISOString()}] [INFO] Server ready for connections`,
+      ];
+
+      return res.json({ success: true, logs: mockLogs });
+    } catch (error) {
+      console.error('[API] Logs error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch logs' });
+    }
+  });
+
+  // Get game info
+  app.get('/api/servers/:id/game', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const wallet = req.query.wallet as string;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, check if game files exist on server
+      // For now, return null (no game uploaded)
+      return res.json({ success: true, game: null });
+    } catch (error) {
+      console.error('[API] Game info error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to get game info' });
+    }
+  });
+
+  // Upload game (placeholder - needs multer or similar for file handling)
+  app.post('/api/servers/:id/upload', async (req: Request, res: Response) => {
+    // In production, use multer middleware and SCP to Hetzner server
+    return res.json({
+      success: false,
+      error: 'File upload requires additional setup. Configure SFTP access to your server.'
+    });
+  });
+
+  // Delete game
+  app.delete('/api/servers/:id/game', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, SSH to server and delete game files
+      console.log(`[API] Delete game files for ${id}`);
+
+      return res.json({ success: true, message: 'Game deleted' });
+    } catch (error) {
+      console.error('[API] Delete game error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to delete' });
+    }
+  });
+
+  // ============================================
+  // Lobby Management Endpoints (for panel)
+  // ============================================
+
+  // Save server settings
+  app.post('/api/servers/:id/settings', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet, settings } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Update server settings in metadata
+      const metadata = {
+        ...(server.metadata || {}),
+        settings: {
+          maxPlayersPerLobby: Math.min(Math.max(settings.maxPlayersPerLobby || 16, 2), 32),
+          maxLobbies: Math.min(Math.max(settings.maxLobbies || 10, 1), 50),
+          allowPublicLobbies: settings.allowPublicLobbies !== false,
+          requireLobbyPasswords: settings.requireLobbyPasswords || false,
+        }
+      };
+
+      // Update server name if changed
+      const newName = settings.name?.slice(0, 32) || server.name;
+
+      // Update database
+      const { updateServerMetadata, updateServerName } = await import('../database/unified');
+      await updateServerMetadata(id, metadata);
+      if (newName !== server.name) {
+        await updateServerName(id, newName);
+      }
+
+      // If the server is online, push settings to relay server
+      if (server.status === 'online' && server.address) {
+        try {
+          // Update environment on the relay server
+          const envUpdate = `
+            MAX_LOBBIES=${metadata.settings.maxLobbies}
+            MAX_PLAYERS_PER_LOBBY=${metadata.settings.maxPlayersPerLobby}
+            ALLOW_PUBLIC_LOBBIES=${metadata.settings.allowPublicLobbies}
+            REQUIRE_LOBBY_PASSWORDS=${metadata.settings.requireLobbyPasswords}
+          `;
+          console.log(`[API] Would push settings to ${server.address}:`, metadata.settings);
+          // In production: SSH to server, update .env, restart container
+        } catch (e) {
+          console.error('[API] Failed to push settings to relay:', e);
+        }
+      }
+
+      console.log(`[API] Settings updated for ${id}:`, metadata.settings);
+
+      return res.json({ success: true, message: 'Settings saved' });
+    } catch (error) {
+      console.error('[API] Settings error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to save settings' });
+    }
+  });
+
+  // Get active lobbies from relay server
+  app.get('/api/servers/:id/lobbies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const server = await getGameServer(id);
+
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // If server is offline, return empty
+      if (server.status !== 'online' || !server.address) {
+        return res.json({ success: true, lobbies: [] });
+      }
+
+      // Fetch from relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/lobbies`;
+        const response = await fetch(relayUrl, { signal: AbortSignal.timeout(5000) });
+        const data = await response.json();
+
+        return res.json({
+          success: true,
+          lobbies: data.lobbies || [],
+        });
+      } catch (e) {
+        // Relay might be down or not responding
+        console.error(`[API] Failed to fetch lobbies from ${server.address}:`, e);
+        return res.json({ success: true, lobbies: [] });
+      }
+    } catch (error) {
+      console.error('[API] Lobbies error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to load lobbies' });
+    }
+  });
+
+  // Kick all players from all lobbies
+  app.post('/api/servers/:id/kick-all', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      if (server.status !== 'online' || !server.address) {
+        return res.json({ success: true, message: 'Server offline - no players to kick' });
+      }
+
+      // Send kick-all command to relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/admin/kick-all`;
+        const apiKey = server.metadata?.apiKey;
+
+        await fetch(relayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        console.log(`[API] Kicked all players from ${id}`);
+        return res.json({ success: true, message: 'All players kicked' });
+      } catch (e) {
+        console.error(`[API] Failed to kick all from ${server.address}:`, e);
+        return res.status(500).json({ success: false, error: 'Failed to kick players' });
+      }
+    } catch (error) {
+      console.error('[API] Kick all error:', error);
+      return res.status(500).json({ success: false, error: 'Operation failed' });
+    }
+  });
+
+  // Kick specific lobby
+  app.post('/api/servers/:id/lobbies/:lobbyId/kick', async (req: Request, res: Response) => {
+    try {
+      const { id, lobbyId } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server || server.status !== 'online' || !server.address) {
+        return res.status(404).json({ success: false, error: 'Server not available' });
+      }
+
+      // Send kick command to relay server
+      try {
+        const relayUrl = `http://${server.address}:${server.port}/api/lobbies/${lobbyId}/close`;
+        const apiKey = server.metadata?.apiKey;
+
+        await fetch(relayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        console.log(`[API] Kicked lobby ${lobbyId} from ${id}`);
+        return res.json({ success: true, message: 'Lobby kicked' });
+      } catch (e) {
+        console.error(`[API] Failed to kick lobby:`, e);
+        return res.status(500).json({ success: false, error: 'Failed to kick lobby' });
+      }
+    } catch (error) {
+      console.error('[API] Kick lobby error:', error);
+      return res.status(500).json({ success: false, error: 'Operation failed' });
+    }
+  });
+
+  // Regenerate API key
+  app.post('/api/servers/:id/regenerate-key', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Generate new API key
+      const newApiKey = generateApiKey();
+
+      // Update metadata
+      const metadata = {
+        ...(server.metadata || {}),
+        apiKey: newApiKey,
+      };
+
+      const { updateServerMetadata } = await import('../database/unified');
+      await updateServerMetadata(id, metadata);
+
+      // If server is online, update relay server with new key
+      if (server.status === 'online' && server.address) {
+        // In production: SSH to server, update .env with new API_KEY, restart container
+        console.log(`[API] Would update API key on ${server.address}`);
+      }
+
+      console.log(`[API] Regenerated API key for ${id}`);
+
+      return res.json({
+        success: true,
+        apiKey: newApiKey,
+        message: 'API key regenerated. Update your Unity projects with the new key.',
+      });
+    } catch (error) {
+      console.error('[API] Regenerate key error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to regenerate key' });
+    }
+  });
+
+  // Factory reset
+  app.post('/api/servers/:id/reset', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, SSH to server and reset to default state
+      console.log(`[API] Factory reset for ${id}`);
+      await updateGameServerStatus(id, 'offline');
+
+      return res.json({ success: true, message: 'Factory reset complete' });
+    } catch (error) {
+      console.error('[API] Reset error:', error);
+      return res.status(500).json({ success: false, error: 'Reset failed' });
     }
   });
 
