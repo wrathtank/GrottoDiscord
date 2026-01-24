@@ -858,7 +858,7 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
       try {
         const relayUrl = `http://${server.address}:${server.port}/api/lobbies`;
         const response = await fetch(relayUrl, { signal: AbortSignal.timeout(5000) });
-        const data = await response.json();
+        const data = await response.json() as { lobbies?: any[] };
 
         return res.json({
           success: true,
