@@ -230,13 +230,14 @@ write_files:
       #!/bin/bash
       API="${process.env.API_URL || 'https://grotto-discord-bot-7dcd8c6451fc.herokuapp.com'}"
       SERVER_ID="${serverId}"
+      API_KEY="${apiKey}"
       while true; do
         HEALTH=$(curl -s http://localhost:${port}/health 2>/dev/null || echo '{}')
         PLAYERS=$(echo $HEALTH | grep -o '"players":[0-9]*' | grep -o '[0-9]*' || echo "0")
         LOBBIES=$(echo $HEALTH | grep -o '"lobbies":[0-9]*' | grep -o '[0-9]*' || echo "0")
         curl -s -X POST "$API/api/servers/$SERVER_ID/heartbeat" \\
           -H "Content-Type: application/json" \\
-          -d "{\\"currentPlayers\\": $PLAYERS, \\"lobbies\\": $LOBBIES, \\"status\\": \\"online\\"}" || true
+          -d "{\\"currentPlayers\\": $PLAYERS, \\"lobbies\\": $LOBBIES, \\"secret\\": \\"$API_KEY\\"}" || true
         sleep 60
       done
 
