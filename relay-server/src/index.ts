@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,7 +39,7 @@ interface Lobby {
   maxPlayers: number;
   isPublic: boolean;
   hasPassword: boolean;
-  password: string | null;
+  passwordHash: string | null;
   players: Map<string, Player>;
   createdAt: Date;
 }
@@ -51,9 +52,10 @@ const tokenToPlayer = new Map<string, string>();
 // Helpers
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(6);
   let code = '';
   for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[bytes[i] % chars.length];
   }
   // Ensure unique
   for (const lobby of lobbies.values()) {
@@ -64,6 +66,15 @@ function generateCode(): string {
 
 function generateToken(): string {
   return uuidv4() + '-' + Date.now().toString(36);
+}
+
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function verifyPassword(input: string, hash: string): boolean {
+  const inputHash = hashPassword(input);
+  return crypto.timingSafeEqual(Buffer.from(inputHash), Buffer.from(hash));
 }
 
 function lobbyToJson(lobby: Lobby, includePassword = false) {
@@ -162,7 +173,7 @@ app.post('/api/lobbies', (req, res) => {
     maxPlayers: Math.min(Math.max(maxPlayers || 8, 2), MAX_PLAYERS_PER_LOBBY),
     isPublic: isPublic !== false,
     hasPassword: !!password,
-    password: password || null,
+    passwordHash: password ? hashPassword(password) : null,
     players: new Map(),
     createdAt: new Date()
   };
@@ -197,7 +208,7 @@ app.post('/api/lobbies/join', (req, res) => {
     return res.status(400).json({ success: false, error: 'Lobby is full' });
   }
 
-  if (lobby.hasPassword && lobby.password !== password) {
+  if (lobby.hasPassword && lobby.passwordHash && !verifyPassword(password || '', lobby.passwordHash)) {
     return res.status(403).json({ success: false, error: 'Invalid password' });
   }
 

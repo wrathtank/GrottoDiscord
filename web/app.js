@@ -54,7 +54,9 @@ if (apiUrl && !isValidApiUrl(apiUrl)) {
 console.log('Verification params:', { sessionId, nonce, timestamp, apiUrl });
 
 function generateNonce() {
-  return Math.random().toString(36).substring(2, 18);
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Generate the message to sign (must match the bot's format)

@@ -345,7 +345,9 @@ function formatDate(ts) {
 }
 
 function generateDisplayKey() {
-  return 'grotto_' + Math.random().toString(36).substr(2, 16);
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return 'grotto_' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function esc(str) {

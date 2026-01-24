@@ -45,8 +45,15 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
 
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
+      // In production, require origin header
+      // Only allow null origin in development for tools like Postman
+      if (!origin) {
+        const isDev = process.env.NODE_ENV !== 'production';
+        if (isDev) {
+          return callback(null, true);
+        }
+        return callback(new Error('Origin header required'));
+      }
 
       if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
         callback(null, true);
@@ -57,10 +64,8 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   }));
-
-  // Handle preflight requests
-  app.options('*', cors());
 
   app.use(express.json());
 
@@ -599,8 +604,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         return res.status(404).json({ success: false, error: 'Server not found.' });
       }
 
-      // TODO: Validate secret/auth token
-      // For now, just update the heartbeat
+      // Validate API key from server metadata
+      const expectedApiKey = server.metadata?.apiKey;
+      if (!expectedApiKey || secret !== expectedApiKey) {
+        return res.status(403).json({ success: false, error: 'Invalid API key.' });
+      }
 
       const { updateServerHeartbeat } = await import('../database/unified');
       await updateServerHeartbeat(id, currentPlayers || 0);
