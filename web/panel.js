@@ -93,6 +93,28 @@ async function checkWallet() {
   }
 }
 
+// Sign a message to prove wallet ownership for API auth
+async function signAuthMessage() {
+  const eth = window.avalanche || window.ethereum;
+  if (!eth || !walletAddress) {
+    throw new Error('Wallet not connected');
+  }
+
+  const timestamp = Date.now();
+  const message = `Grotto Server Action\nServer: ${serverId}\nTimestamp: ${timestamp}`;
+
+  try {
+    const signature = await eth.request({
+      method: 'personal_sign',
+      params: [message, walletAddress],
+    });
+    return { signature, timestamp };
+  } catch (e) {
+    console.error('Signing failed:', e);
+    throw new Error('User rejected signature');
+  }
+}
+
 async function loadServer() {
   try {
     const res = await fetch(`${API_URL}/api/servers/${serverId}`);
@@ -175,10 +197,13 @@ async function saveSettings() {
   };
 
   try {
+    showToast('Please sign the message...', 'info');
+    const { signature, timestamp } = await signAuthMessage();
+
     const res = await fetch(`${API_URL}/api/servers/${serverId}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet: walletAddress, settings })
+      body: JSON.stringify({ wallet: walletAddress, signature, timestamp, settings })
     });
 
     const data = await res.json();
@@ -189,7 +214,11 @@ async function saveSettings() {
       showToast(data.error || 'Failed to save', 'error');
     }
   } catch (e) {
-    showToast('Failed to save settings', 'error');
+    if (e.message === 'User rejected signature') {
+      showToast('Signature rejected', 'error');
+    } else {
+      showToast('Failed to save settings', 'error');
+    }
   }
 }
 
@@ -231,10 +260,13 @@ async function kickLobby(lobbyId) {
   if (!confirm('Kick all players from this lobby?')) return;
 
   try {
+    showToast('Please sign the message...', 'info');
+    const { signature, timestamp } = await signAuthMessage();
+
     await fetch(`${API_URL}/api/servers/${serverId}/lobbies/${lobbyId}/kick`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet: walletAddress })
+      body: JSON.stringify({ wallet: walletAddress, signature, timestamp })
     });
     showToast('Lobby kicked');
     loadLobbies();
@@ -248,15 +280,22 @@ async function kickAll() {
   if (!confirm('Kick ALL players from ALL lobbies?')) return;
 
   try {
+    showToast('Please sign the message...', 'info');
+    const { signature, timestamp } = await signAuthMessage();
+
     await fetch(`${API_URL}/api/servers/${serverId}/kick-all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet: walletAddress })
+      body: JSON.stringify({ wallet: walletAddress, signature, timestamp })
     });
     showToast('All players kicked');
     loadLobbies();
   } catch (e) {
-    showToast('Failed', 'error');
+    if (e.message === 'User rejected signature') {
+      showToast('Signature rejected', 'error');
+    } else {
+      showToast('Failed', 'error');
+    }
   }
 }
 
@@ -265,10 +304,13 @@ async function regenerateKey() {
   if (!confirm('Regenerate API key? Your Unity projects will need the new key.')) return;
 
   try {
+    showToast('Please sign the message...', 'info');
+    const { signature, timestamp } = await signAuthMessage();
+
     const res = await fetch(`${API_URL}/api/servers/${serverId}/regenerate-key`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet: walletAddress })
+      body: JSON.stringify({ wallet: walletAddress, signature, timestamp })
     });
     const data = await res.json();
     if (data.success) {
@@ -280,7 +322,11 @@ async function regenerateKey() {
       showToast(data.error || 'Failed', 'error');
     }
   } catch (e) {
-    showToast('Failed', 'error');
+    if (e.message === 'User rejected signature') {
+      showToast('Signature rejected', 'error');
+    } else {
+      showToast('Failed', 'error');
+    }
   }
 }
 
