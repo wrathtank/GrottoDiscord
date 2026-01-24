@@ -653,6 +653,7 @@ interface GrottoGame {
   description: string;
   thumbnail_url: string;
   creator_address: string;
+  creator_username?: string;
   created_at: string;
   genre: string;
   license_type: string;
@@ -717,14 +718,16 @@ async function handleActivity(interaction: ChatInputCommandInteraction) {
         ? (game.description.length > 200 ? game.description.slice(0, 200) + '...' : game.description)
         : 'Check out this game on The Grotto!';
 
+      const creatorDisplay = game.creator_username || truncateAddress(game.creator_address);
+
       await (targetChannel as any).send({
         embeds: [{
           title: `🎮 ${game.name}`,
-          description: `${description}\n\n**Genre:** ${game.genre || 'N/A'}\n**License:** ${game.license_type || 'N/A'}${game.license_price ? ` (${game.license_price} AVAX)` : ''}\n\n[Play Now](${gameUrl})`,
+          description: `${description}\n\n**Genre:** ${game.genre || 'N/A'}\n**License:** ${game.license_type || 'N/A'}${game.license_price ? ` (${game.license_price} HERESY)` : ''}\n\n[Play Now](${gameUrl})`,
           color: 0x7c3aed,
           thumbnail: game.thumbnail_url ? { url: game.thumbnail_url } : undefined,
           footer: {
-            text: `The Grotto • Created by ${truncateAddress(game.creator_address)}`
+            text: `The Grotto • Created by ${creatorDisplay}`
           },
           timestamp: new Date().toISOString()
         }]
