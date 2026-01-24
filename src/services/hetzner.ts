@@ -314,7 +314,7 @@ export async function createHetznerServer(
       }),
     });
 
-    const data: HetznerResponse = await response.json();
+    const data = await response.json() as HetznerResponse;
 
     if (data.error) {
       console.error('[Hetzner] API error:', data.error);
@@ -358,7 +358,7 @@ export async function deleteHetznerServer(hetznerServerId: number): Promise<bool
       return true;
     }
 
-    const data = await response.json();
+    const data = await response.json() as HetznerResponse;
     console.error('[Hetzner] Failed to delete:', data.error);
     return false;
   } catch (error) {
@@ -378,7 +378,7 @@ export async function getHetznerServerStatus(hetznerServerId: number): Promise<s
       },
     });
 
-    const data: HetznerResponse = await response.json();
+    const data = await response.json() as HetznerResponse;
     return data.server?.status || null;
   } catch (error) {
     console.error('[Hetzner] Status check error:', error);
@@ -422,7 +422,7 @@ export async function listGrottoServers(): Promise<HetznerServer[]> {
       }
     );
 
-    const data = await response.json();
+    const data = await response.json() as { servers?: HetznerServer[] };
     return data.servers || [];
   } catch (error) {
     console.error('[Hetzner] List servers error:', error);
