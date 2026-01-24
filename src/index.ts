@@ -163,6 +163,9 @@ async function main(): Promise<void> {
 let refreshInterval: NodeJS.Timeout | null = null;
 let securityInterval: NodeJS.Timeout | null = null;
 
+// Track last periodic message per channel for deletion
+const lastPeriodicMessages = new Map<string, string>();
+
 // Grotto API endpoints
 const GROTTO_API_BASE = 'https://api.enterthegrotto.xyz';
 const GROTTO_GAMES_URL = `${GROTTO_API_BASE}/api/games`;
@@ -200,6 +203,7 @@ interface GrottoGame {
   description: string;
   thumbnail_url: string;
   creator_address: string;
+  creator_username?: string;
   created_at: string;
   genre: string;
   license_type: string;
@@ -263,13 +267,29 @@ async function sendPeriodicMessage(client: any, channelId: string): Promise<void
       return;
     }
 
+    // Delete previous bot message in this channel if it exists
+    const previousMessageId = lastPeriodicMessages.get(channelId);
+    if (previousMessageId) {
+      try {
+        const previousMessage = await channel.messages.fetch(previousMessageId).catch(() => null);
+        if (previousMessage && previousMessage.author.id === client.user?.id) {
+          await previousMessage.delete();
+          console.log('[Periodic] Deleted previous message:', previousMessageId);
+        }
+      } catch (error) {
+        console.log('[Periodic] Could not delete previous message:', error);
+      }
+    }
+
     // Randomly decide what type of message to send (40% security, 40% game, 20% activity)
     const rand = Math.random();
+
+    let sentMessage: any;
 
     if (rand < 0.4) {
       // Send security message
       const message = securityMessages[Math.floor(Math.random() * securityMessages.length)];
-      await channel.send({
+      sentMessage = await channel.send({
         embeds: [{
           title: message.title,
           description: message.description,
@@ -287,7 +307,7 @@ async function sendPeriodicMessage(client: any, channelId: string): Promise<void
       if (games.length === 0) {
         // Fallback to security message
         const message = securityMessages[Math.floor(Math.random() * securityMessages.length)];
-        await channel.send({
+        sentMessage = await channel.send({
           embeds: [{
             title: message.title,
             description: message.description,
@@ -297,37 +317,38 @@ async function sendPeriodicMessage(client: any, channelId: string): Promise<void
           }]
         });
         console.log('[Periodic] No games available, sent security reminder instead');
-        return;
+      } else {
+        const game = games[Math.floor(Math.random() * games.length)];
+        const gameSlug = createGameSlug(game.name);
+        const gameUrl = `${GROTTO_GAME_PAGE_BASE}/${gameSlug}`;
+
+        const description = game.description
+          ? (game.description.length > 200 ? game.description.slice(0, 200) + '...' : game.description)
+          : 'Check out this game on The Grotto!';
+
+        const creatorDisplay = game.creator_username || truncateAddress(game.creator_address);
+
+        sentMessage = await channel.send({
+          embeds: [{
+            title: `🎮 ${game.name}`,
+            description: `${description}\n\n**Genre:** ${game.genre || 'N/A'}\n**License:** ${game.license_type || 'N/A'}${game.license_price ? ` (${game.license_price} HERESY)` : ''}\n\n[Play Now](${gameUrl})`,
+            color: 0x7c3aed,
+            thumbnail: game.thumbnail_url ? { url: game.thumbnail_url } : undefined,
+            footer: {
+              text: `The Grotto • Created by ${creatorDisplay}`
+            },
+            timestamp: new Date().toISOString()
+          }]
+        });
+        console.log('[Periodic] Sent game highlight:', game.name);
       }
-
-      const game = games[Math.floor(Math.random() * games.length)];
-      const gameSlug = createGameSlug(game.name);
-      const gameUrl = `${GROTTO_GAME_PAGE_BASE}/${gameSlug}`;
-
-      const description = game.description
-        ? (game.description.length > 200 ? game.description.slice(0, 200) + '...' : game.description)
-        : 'Check out this game on The Grotto!';
-
-      await channel.send({
-        embeds: [{
-          title: `🎮 ${game.name}`,
-          description: `${description}\n\n**Genre:** ${game.genre || 'N/A'}\n**License:** ${game.license_type || 'N/A'}${game.license_price ? ` (${game.license_price} AVAX)` : ''}\n\n[Play Now](${gameUrl})`,
-          color: 0x7c3aed,
-          thumbnail: game.thumbnail_url ? { url: game.thumbnail_url } : undefined,
-          footer: {
-            text: `The Grotto • Created by ${truncateAddress(game.creator_address)}`
-          },
-          timestamp: new Date().toISOString()
-        }]
-      });
-      console.log('[Periodic] Sent game highlight:', game.name);
     } else {
       // Send live activity
       const activities = await fetchGrottoActivity();
       if (activities.length === 0) {
         // Fallback to security message
         const message = securityMessages[Math.floor(Math.random() * securityMessages.length)];
-        await channel.send({
+        sentMessage = await channel.send({
           embeds: [{
             title: message.title,
             description: message.description,
@@ -337,29 +358,33 @@ async function sendPeriodicMessage(client: any, channelId: string): Promise<void
           }]
         });
         console.log('[Periodic] No activity available, sent security reminder instead');
-        return;
+      } else {
+        // Show recent activity summary
+        const recentActivities = activities.slice(0, 5);
+        const activityLines = recentActivities.map(a => {
+          const user = truncateAddress(a.user_address);
+          const gameName = a.game_name || 'a game';
+          return `• **${user}** ${a.details || a.type} in *${gameName}*`;
+        }).join('\n');
+
+        sentMessage = await channel.send({
+          embeds: [{
+            title: '🔥 Live Activity',
+            description: `**What's happening in The Grotto:**\n\n${activityLines}\n\n[Join the action!](https://thegrotto.gg)`,
+            color: 0xf59e0b,
+            footer: {
+              text: 'The Grotto • Gaming on Avalanche'
+            },
+            timestamp: new Date().toISOString()
+          }]
+        });
+        console.log('[Periodic] Sent live activity summary');
       }
+    }
 
-      // Show recent activity summary
-      const recentActivities = activities.slice(0, 5);
-      const activityLines = recentActivities.map(a => {
-        const user = truncateAddress(a.user_address);
-        const gameName = a.game_name || 'a game';
-        return `• **${user}** ${a.details || a.type} in *${gameName}*`;
-      }).join('\n');
-
-      await channel.send({
-        embeds: [{
-          title: '🔥 Live Activity',
-          description: `**What's happening in The Grotto:**\n\n${activityLines}\n\n[Join the action!](https://thegrotto.gg)`,
-          color: 0xf59e0b,
-          footer: {
-            text: 'The Grotto • Gaming on Avalanche'
-          },
-          timestamp: new Date().toISOString()
-        }]
-      });
-      console.log('[Periodic] Sent live activity summary');
+    // Track the sent message for future deletion
+    if (sentMessage?.id) {
+      lastPeriodicMessages.set(channelId, sentMessage.id);
     }
   } catch (error) {
     console.error('[Periodic] Failed to send message:', error);
