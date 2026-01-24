@@ -1,7 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import path from 'path';
 import fs from 'fs';
-import { LinkedWallet, VerificationSession } from '../types';
+import { LinkedWallet, VerificationSession, GameServer, ServerRental, ServerTier, ServerStatus } from '../types';
 
 // Determine database location based on environment
 const isHeroku = !!process.env.DYNO;
@@ -99,11 +99,57 @@ export async function initDatabase(): Promise<void> {
     )
   `);
 
+  // Game servers table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS game_servers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      game_name TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      tier TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      address TEXT,
+      port INTEGER DEFAULT 7777,
+      has_password INTEGER DEFAULT 0,
+      password_hash TEXT,
+      current_players INTEGER DEFAULT 0,
+      max_players INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      last_heartbeat INTEGER,
+      tx_hash TEXT,
+      metadata TEXT
+    )
+  `);
+
+  // Server rentals/payments table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS server_rentals (
+      id TEXT PRIMARY KEY,
+      server_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      tier TEXT NOT NULL,
+      duration INTEGER NOT NULL,
+      price_per_month INTEGER NOT NULL,
+      total_price INTEGER NOT NULL,
+      discount REAL DEFAULT 0,
+      tx_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at INTEGER NOT NULL,
+      confirmed_at INTEGER,
+      FOREIGN KEY (server_id) REFERENCES game_servers(id)
+    )
+  `);
+
   // Create indexes
   db.run(`CREATE INDEX IF NOT EXISTS idx_wallets_discord ON linked_wallets(discord_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_wallets_address ON linked_wallets(wallet_address)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_discord ON verification_sessions(discord_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_roles_discord ON role_assignments(discord_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_servers_owner ON game_servers(owner_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_servers_status ON game_servers(status)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rentals_owner ON server_rentals(owner_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rentals_server ON server_rentals(server_id)`);
 
   // Save initial state
   saveDatabase();
@@ -364,4 +410,263 @@ export function getDatabase(): Database {
 
 export function forceSave(): void {
   saveDatabase();
+}
+
+// ============================================
+// Game Server Functions
+// ============================================
+
+export function createGameServer(server: GameServer): void {
+  db.run(
+    `INSERT INTO game_servers (
+      id, name, game_name, owner_id, tier, status, address, port,
+      has_password, password_hash, current_players, max_players,
+      created_at, expires_at, last_heartbeat, tx_hash, metadata
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      server.id,
+      server.name,
+      server.gameName,
+      server.ownerId,
+      server.tier,
+      server.status,
+      server.address || null,
+      server.port,
+      server.hasPassword ? 1 : 0,
+      server.passwordHash || null,
+      server.currentPlayers,
+      server.maxPlayers,
+      server.createdAt,
+      server.expiresAt,
+      server.lastHeartbeat || null,
+      server.txHash || null,
+      server.metadata ? JSON.stringify(server.metadata) : null
+    ]
+  );
+  markChanged();
+}
+
+export function getGameServer(id: string): GameServer | null {
+  const stmt = db.prepare(`
+    SELECT id, name, game_name as gameName, owner_id as ownerId, tier, status,
+           address, port, has_password as hasPassword, password_hash as passwordHash,
+           current_players as currentPlayers, max_players as maxPlayers,
+           created_at as createdAt, expires_at as expiresAt,
+           last_heartbeat as lastHeartbeat, tx_hash as txHash, metadata
+    FROM game_servers WHERE id = ?
+  `);
+  stmt.bind([id]);
+
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return {
+      ...row,
+      hasPassword: !!row.hasPassword,
+      metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined
+    } as GameServer;
+  }
+  stmt.free();
+  return null;
+}
+
+export function getGameServersByOwner(ownerId: string): GameServer[] {
+  const stmt = db.prepare(`
+    SELECT id, name, game_name as gameName, owner_id as ownerId, tier, status,
+           address, port, has_password as hasPassword, password_hash as passwordHash,
+           current_players as currentPlayers, max_players as maxPlayers,
+           created_at as createdAt, expires_at as expiresAt,
+           last_heartbeat as lastHeartbeat, tx_hash as txHash, metadata
+    FROM game_servers WHERE LOWER(owner_id) = LOWER(?)
+    ORDER BY created_at DESC
+  `);
+  stmt.bind([ownerId]);
+
+  const servers: GameServer[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    servers.push({
+      ...row,
+      hasPassword: !!row.hasPassword,
+      metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined
+    } as GameServer);
+  }
+  stmt.free();
+  return servers;
+}
+
+export function getAllGameServers(
+  status?: ServerStatus,
+  limit: number = 100,
+  offset: number = 0
+): GameServer[] {
+  let query = `
+    SELECT id, name, game_name as gameName, owner_id as ownerId, tier, status,
+           address, port, has_password as hasPassword, password_hash as passwordHash,
+           current_players as currentPlayers, max_players as maxPlayers,
+           created_at as createdAt, expires_at as expiresAt,
+           last_heartbeat as lastHeartbeat, tx_hash as txHash, metadata
+    FROM game_servers
+  `;
+
+  if (status) {
+    query += ` WHERE status = ?`;
+  }
+  query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+
+  const stmt = db.prepare(query);
+  if (status) {
+    stmt.bind([status, limit, offset]);
+  } else {
+    stmt.bind([limit, offset]);
+  }
+
+  const servers: GameServer[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    servers.push({
+      ...row,
+      hasPassword: !!row.hasPassword,
+      metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined
+    } as GameServer);
+  }
+  stmt.free();
+  return servers;
+}
+
+export function updateGameServerStatus(id: string, status: ServerStatus, address?: string): void {
+  if (address) {
+    db.run('UPDATE game_servers SET status = ?, address = ? WHERE id = ?', [status, address, id]);
+  } else {
+    db.run('UPDATE game_servers SET status = ? WHERE id = ?', [status, id]);
+  }
+  markChanged();
+}
+
+export function updateServerHeartbeat(id: string, currentPlayers: number): void {
+  db.run(
+    'UPDATE game_servers SET last_heartbeat = ?, current_players = ? WHERE id = ?',
+    [Date.now(), currentPlayers, id]
+  );
+  markChanged();
+}
+
+export function deleteGameServer(id: string): void {
+  db.run('DELETE FROM game_servers WHERE id = ?', [id]);
+  markChanged();
+}
+
+export function getExpiredServers(): GameServer[] {
+  const stmt = db.prepare(`
+    SELECT id, name, game_name as gameName, owner_id as ownerId, tier, status,
+           address, port, has_password as hasPassword, password_hash as passwordHash,
+           current_players as currentPlayers, max_players as maxPlayers,
+           created_at as createdAt, expires_at as expiresAt,
+           last_heartbeat as lastHeartbeat, tx_hash as txHash, metadata
+    FROM game_servers WHERE expires_at < ? AND status NOT IN ('expired', 'terminated')
+  `);
+  stmt.bind([Date.now()]);
+
+  const servers: GameServer[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    servers.push({
+      ...row,
+      hasPassword: !!row.hasPassword,
+      metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined
+    } as GameServer);
+  }
+  stmt.free();
+  return servers;
+}
+
+// ============================================
+// Server Rental Functions
+// ============================================
+
+export function createServerRental(rental: ServerRental): void {
+  db.run(
+    `INSERT INTO server_rentals (
+      id, server_id, owner_id, tier, duration, price_per_month,
+      total_price, discount, tx_hash, status, created_at, confirmed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      rental.id,
+      rental.serverId,
+      rental.ownerId,
+      rental.tier,
+      rental.duration,
+      rental.pricePerMonth,
+      rental.totalPrice,
+      rental.discount,
+      rental.txHash,
+      rental.status,
+      rental.createdAt,
+      rental.confirmedAt || null
+    ]
+  );
+  markChanged();
+}
+
+export function getServerRental(id: string): ServerRental | null {
+  const stmt = db.prepare(`
+    SELECT id, server_id as serverId, owner_id as ownerId, tier, duration,
+           price_per_month as pricePerMonth, total_price as totalPrice,
+           discount, tx_hash as txHash, status, created_at as createdAt,
+           confirmed_at as confirmedAt
+    FROM server_rentals WHERE id = ?
+  `);
+  stmt.bind([id]);
+
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as unknown as ServerRental;
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
+
+export function getRentalByTxHash(txHash: string): ServerRental | null {
+  const stmt = db.prepare(`
+    SELECT id, server_id as serverId, owner_id as ownerId, tier, duration,
+           price_per_month as pricePerMonth, total_price as totalPrice,
+           discount, tx_hash as txHash, status, created_at as createdAt,
+           confirmed_at as confirmedAt
+    FROM server_rentals WHERE tx_hash = ?
+  `);
+  stmt.bind([txHash]);
+
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as unknown as ServerRental;
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
+
+export function updateRentalStatus(id: string, status: 'pending' | 'confirmed' | 'failed' | 'refunded'): void {
+  const confirmedAt = status === 'confirmed' ? Date.now() : null;
+  db.run('UPDATE server_rentals SET status = ?, confirmed_at = ? WHERE id = ?', [status, confirmedAt, id]);
+  markChanged();
+}
+
+export function getRentalsByOwner(ownerId: string): ServerRental[] {
+  const stmt = db.prepare(`
+    SELECT id, server_id as serverId, owner_id as ownerId, tier, duration,
+           price_per_month as pricePerMonth, total_price as totalPrice,
+           discount, tx_hash as txHash, status, created_at as createdAt,
+           confirmed_at as confirmedAt
+    FROM server_rentals WHERE LOWER(owner_id) = LOWER(?)
+    ORDER BY created_at DESC
+  `);
+  stmt.bind([ownerId]);
+
+  const rentals: ServerRental[] = [];
+  while (stmt.step()) {
+    rentals.push(stmt.getAsObject() as unknown as ServerRental);
+  }
+  stmt.free();
+  return rentals;
 }

@@ -1,4 +1,4 @@
-import { LinkedWallet, VerificationSession } from '../types';
+import { LinkedWallet, VerificationSession, GameServer, ServerRental, ServerStatus } from '../types';
 import * as sqlite from './index';
 import * as supabase from './supabase';
 
@@ -138,4 +138,76 @@ export async function getAllLinkedWallets(): Promise<LinkedWallet[]> {
 
 export function isUsingSupabase(): boolean {
   return useSupabase;
+}
+
+// ============================================
+// Game Server Functions (SQLite only for now)
+// ============================================
+
+export async function createGameServer(server: GameServer): Promise<void> {
+  // TODO: Add Supabase support
+  sqlite.createGameServer(server);
+}
+
+export async function getGameServer(id: string): Promise<GameServer | null> {
+  return sqlite.getGameServer(id);
+}
+
+export async function getGameServersByOwner(ownerId: string): Promise<GameServer[]> {
+  return sqlite.getGameServersByOwner(ownerId);
+}
+
+export async function getAllGameServers(
+  status?: ServerStatus,
+  limit?: number,
+  offset?: number
+): Promise<GameServer[]> {
+  return sqlite.getAllGameServers(status, limit, offset);
+}
+
+export async function updateGameServerStatus(
+  id: string,
+  status: ServerStatus,
+  address?: string
+): Promise<void> {
+  sqlite.updateGameServerStatus(id, status, address);
+}
+
+export async function updateServerHeartbeat(id: string, currentPlayers: number): Promise<void> {
+  sqlite.updateServerHeartbeat(id, currentPlayers);
+}
+
+export async function deleteGameServer(id: string): Promise<void> {
+  sqlite.deleteGameServer(id);
+}
+
+export async function getExpiredServers(): Promise<GameServer[]> {
+  return sqlite.getExpiredServers();
+}
+
+// ============================================
+// Server Rental Functions (SQLite only for now)
+// ============================================
+
+export async function createServerRental(rental: ServerRental): Promise<void> {
+  sqlite.createServerRental(rental);
+}
+
+export async function getServerRental(id: string): Promise<ServerRental | null> {
+  return sqlite.getServerRental(id);
+}
+
+export async function getRentalByTxHash(txHash: string): Promise<ServerRental | null> {
+  return sqlite.getRentalByTxHash(txHash);
+}
+
+export async function updateRentalStatus(
+  id: string,
+  status: 'pending' | 'confirmed' | 'failed' | 'refunded'
+): Promise<void> {
+  sqlite.updateRentalStatus(id, status);
+}
+
+export async function getRentalsByOwner(ownerId: string): Promise<ServerRental[]> {
+  return sqlite.getRentalsByOwner(ownerId);
 }

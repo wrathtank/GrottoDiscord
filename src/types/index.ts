@@ -113,3 +113,78 @@ export interface RpcConfig {
   secondary: string;
   chainId: number;
 }
+
+// ============================================
+// Server Rental Types
+// ============================================
+
+export type ServerTier = 'basic' | 'standard' | 'premium';
+export type ServerStatus = 'pending' | 'provisioning' | 'online' | 'offline' | 'expired' | 'terminated';
+
+export interface ServerTierConfig {
+  name: string;
+  price: number; // HERESY per month
+  maxPlayers: number;
+  cpu: number; // vCPU
+  ram: number; // GB
+  features: string[];
+}
+
+export interface GameServer {
+  id: string;
+  name: string;
+  gameName: string;
+  ownerId: string; // wallet address
+  tier: ServerTier;
+  status: ServerStatus;
+  address: string;
+  port: number;
+  hasPassword: boolean;
+  passwordHash?: string;
+  currentPlayers: number;
+  maxPlayers: number;
+  createdAt: number;
+  expiresAt: number;
+  lastHeartbeat?: number;
+  txHash?: string; // payment transaction hash
+  metadata?: Record<string, unknown>;
+}
+
+export interface ServerRental {
+  id: string;
+  serverId: string;
+  ownerId: string; // wallet address
+  tier: ServerTier;
+  duration: number; // months
+  pricePerMonth: number;
+  totalPrice: number;
+  discount: number;
+  txHash: string;
+  status: 'pending' | 'confirmed' | 'failed' | 'refunded';
+  createdAt: number;
+  confirmedAt?: number;
+}
+
+export interface CreateServerRequest {
+  name: string;
+  gameName: string;
+  password?: string;
+  tier: ServerTier;
+  duration: number;
+  ownerWallet: string;
+  txHash: string;
+}
+
+export interface ServerListResponse {
+  servers: GameServer[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ServerPricingConfig {
+  tiers: Record<ServerTier, ServerTierConfig>;
+  durationDiscounts: Record<number, number>; // duration in months -> discount percentage
+  treasuryAddress: string;
+  heresyTokenAddress: string;
+}
