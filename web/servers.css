@@ -314,6 +314,29 @@
   font-size: 0.6rem;
 }
 
+.server-actions {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #333;
+}
+
+.btn-manage {
+  width: 100%;
+  padding: 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  color: var(--red);
+  background: transparent;
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-manage:hover {
+  background: rgba(255, 0, 51, 0.1);
+}
+
 /* Modal */
 .modal {
   position: fixed;

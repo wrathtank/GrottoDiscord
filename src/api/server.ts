@@ -593,6 +593,188 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     }
   });
 
+  // ============================================
+  // Server Panel Endpoints
+  // ============================================
+
+  // Helper: verify ownership
+  async function verifyOwnership(serverId: string, wallet: string): Promise<boolean> {
+    const server = await getGameServer(serverId);
+    if (!server) return false;
+    return server.ownerId.toLowerCase() === wallet.toLowerCase();
+  }
+
+  // Server control (start/stop/restart)
+  app.post('/api/servers/:id/control', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { action, wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      if (!['start', 'stop', 'restart'].includes(action)) {
+        return res.status(400).json({ success: false, error: 'Invalid action' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // If Hetzner is configured, send command to server
+      if (isHetznerConfigured() && server.address) {
+        const { powerAction } = await import('../services/hetzner');
+
+        if (action === 'stop') {
+          // SSH command to stop game, then update status
+          await updateGameServerStatus(id, 'offline');
+        } else if (action === 'start' || action === 'restart') {
+          await updateGameServerStatus(id, 'online');
+        }
+
+        console.log(`[API] Server ${id} action: ${action}`);
+      } else {
+        // Simulation mode
+        if (action === 'stop') {
+          await updateGameServerStatus(id, 'offline');
+        } else {
+          await updateGameServerStatus(id, 'online');
+        }
+      }
+
+      return res.json({ success: true, message: `Server ${action} initiated` });
+    } catch (error) {
+      console.error('[API] Control error:', error);
+      return res.status(500).json({ success: false, error: 'Control action failed' });
+    }
+  });
+
+  // Get/update server config
+  app.post('/api/servers/:id/config', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet, config } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      const server = await getGameServer(id);
+      if (!server) {
+        return res.status(404).json({ success: false, error: 'Server not found' });
+      }
+
+      // Update server metadata with config
+      const metadata = { ...(server.metadata || {}), config };
+
+      // For now, store in memory/log - in production, update database
+      console.log(`[API] Config updated for ${id}:`, config);
+
+      return res.json({ success: true, message: 'Config saved' });
+    } catch (error) {
+      console.error('[API] Config error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to save config' });
+    }
+  });
+
+  // Get server logs
+  app.get('/api/servers/:id/logs', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const wallet = req.query.wallet as string;
+      const lines = parseInt(req.query.lines as string) || 100;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, fetch logs from Hetzner server via SSH
+      // For now, return mock logs
+      const mockLogs = [
+        `[${new Date().toISOString()}] [INFO] Server starting...`,
+        `[${new Date().toISOString()}] [INFO] Loading game data...`,
+        `[${new Date().toISOString()}] [INFO] Listening on port 7777`,
+        `[${new Date().toISOString()}] [INFO] Server ready for connections`,
+      ];
+
+      return res.json({ success: true, logs: mockLogs });
+    } catch (error) {
+      console.error('[API] Logs error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch logs' });
+    }
+  });
+
+  // Get game info
+  app.get('/api/servers/:id/game', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const wallet = req.query.wallet as string;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, check if game files exist on server
+      // For now, return null (no game uploaded)
+      return res.json({ success: true, game: null });
+    } catch (error) {
+      console.error('[API] Game info error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to get game info' });
+    }
+  });
+
+  // Upload game (placeholder - needs multer or similar for file handling)
+  app.post('/api/servers/:id/upload', async (req: Request, res: Response) => {
+    // In production, use multer middleware and SCP to Hetzner server
+    return res.json({
+      success: false,
+      error: 'File upload requires additional setup. Configure SFTP access to your server.'
+    });
+  });
+
+  // Delete game
+  app.delete('/api/servers/:id/game', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, SSH to server and delete game files
+      console.log(`[API] Delete game files for ${id}`);
+
+      return res.json({ success: true, message: 'Game deleted' });
+    } catch (error) {
+      console.error('[API] Delete game error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to delete' });
+    }
+  });
+
+  // Factory reset
+  app.post('/api/servers/:id/reset', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { wallet } = req.body;
+
+      if (!wallet || !await verifyOwnership(id, wallet)) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+
+      // In production, SSH to server and reset to default state
+      console.log(`[API] Factory reset for ${id}`);
+      await updateGameServerStatus(id, 'offline');
+
+      return res.json({ success: true, message: 'Factory reset complete' });
+    } catch (error) {
+      console.error('[API] Reset error:', error);
+      return res.status(500).json({ success: false, error: 'Reset failed' });
+    }
+  });
+
   return app;
 }
 

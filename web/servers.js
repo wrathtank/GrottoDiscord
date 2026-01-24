@@ -150,7 +150,7 @@ async function loadMyServers() {
     }
 
     $('my-servers-list').innerHTML = data.servers.map(s => `
-      <div class="server-card my-server">
+      <div class="server-card my-server" onclick="window.location.href='/panel?server=${s.id}'">
         <div class="server-top">
           <span class="server-name">${esc(s.name)}</span>
           <span class="status ${s.status}">${s.status}</span>
@@ -161,6 +161,9 @@ async function loadMyServers() {
           <span>Expires: ${formatDate(s.expiresAt)}</span>
         </div>
         <code class="server-addr">${s.address}:${s.port}</code>
+        <div class="server-actions">
+          <button class="btn-manage" onclick="event.stopPropagation(); window.location.href='/panel?server=${s.id}'">MANAGE</button>
+        </div>
       </div>
     `).join('');
   } catch (e) {

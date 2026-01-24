@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Panel - Grotto Servers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div id="particles"></div>
+
+  <div class="panel-container">
+    <!-- Header -->
+    <div class="panel-header">
+      <a href="/servers" class="back-link">&larr; Back to Servers</a>
+      <h1 id="server-name">Loading...</h1>
+      <div class="server-status">
+        <span id="status-badge" class="status offline">OFFLINE</span>
+        <span id="player-count">0/32 players</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button id="btn-start" class="btn-action btn-start" disabled>
+        <span class="icon">&#9654;</span> START
+      </button>
+      <button id="btn-stop" class="btn-action btn-stop" disabled>
+        <span class="icon">&#9632;</span> STOP
+      </button>
+      <button id="btn-restart" class="btn-action btn-restart" disabled>
+        <span class="icon">&#8635;</span> RESTART
+      </button>
+    </div>
+
+    <!-- Connection Info -->
+    <div class="panel-section connection-section">
+      <h2>CONNECTION INFO</h2>
+      <div class="connection-box">
+        <div class="conn-row">
+          <span class="label">Server Address</span>
+          <code id="conn-address">--</code>
+          <button class="btn-copy" onclick="copyToClipboard('conn-address')">Copy</button>
+        </div>
+        <div class="conn-row">
+          <span class="label">Port</span>
+          <code id="conn-port">7777</code>
+        </div>
+        <div class="conn-row">
+          <span class="label">Full Address</span>
+          <code id="conn-full">--:7777</code>
+          <button class="btn-copy" onclick="copyToClipboard('conn-full')">Copy</button>
+        </div>
+      </div>
+      <div class="unity-code">
+        <h3>Unity Client Code</h3>
+        <pre><code id="unity-snippet">// Add to your NetworkManager or connection script
+NetworkManager.singleton.networkAddress = "--";
+NetworkManager.singleton.networkPort = 7777;
+NetworkManager.singleton.StartClient();</code></pre>
+        <button class="btn-copy" onclick="copyCode()">Copy Code</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="upload">UPLOAD GAME</button>
+      <button class="tab" data-tab="config">CONFIG</button>
+      <button class="tab" data-tab="logs">LOGS</button>
+      <button class="tab" data-tab="info">INFO</button>
+    </div>
+
+    <!-- Upload Tab -->
+    <div id="tab-upload" class="tab-content active">
+      <div class="upload-section">
+        <h2>UPLOAD YOUR GAME SERVER</h2>
+        <p class="help-text">Upload your Unity dedicated server build (.zip). The server should be built for Linux x64.</p>
+
+        <div class="upload-steps">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-content">
+              <h4>Build Your Server</h4>
+              <p>In Unity: File → Build Settings → Target Platform: Linux → Server Build ✓ → Build</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-content">
+              <h4>Zip the Build</h4>
+              <p>Zip the entire build folder (should contain your executable and _Data folder)</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-content">
+              <h4>Upload Here</h4>
+              <p>Upload the zip file below. Max size: 500MB</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-input" accept=".zip" hidden>
+          <div class="upload-icon">&#128230;</div>
+          <p>Drag & drop your server.zip here</p>
+          <p class="or">or</p>
+          <button class="btn-fire" onclick="document.getElementById('file-input').click()">
+            <span>BROWSE FILES</span>
+          </button>
+          <div id="upload-progress" class="upload-progress hidden">
+            <div class="progress-bar">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <span id="progress-text">0%</span>
+          </div>
+        </div>
+
+        <div id="current-game" class="current-game hidden">
+          <h3>CURRENT GAME</h3>
+          <div class="game-info">
+            <span id="game-filename">game.zip</span>
+            <span id="game-size">0 MB</span>
+            <span id="game-uploaded">Uploaded: --</span>
+          </div>
+          <button id="btn-delete-game" class="btn-danger">DELETE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Config Tab -->
+    <div id="tab-config" class="tab-content hidden">
+      <div class="config-section">
+        <h2>SERVER CONFIGURATION</h2>
+
+        <div class="config-form">
+          <div class="config-row">
+            <label>Executable Name</label>
+            <input type="text" id="cfg-executable" placeholder="MyGame.x86_64" value="">
+            <span class="help">The main executable file in your build</span>
+          </div>
+
+          <div class="config-row">
+            <label>Port</label>
+            <input type="number" id="cfg-port" value="7777" min="1024" max="65535">
+            <span class="help">Game server port (default: 7777)</span>
+          </div>
+
+          <div class="config-row">
+            <label>Max Players</label>
+            <input type="number" id="cfg-maxplayers" value="32" min="1" max="32">
+            <span class="help">Maximum concurrent players</span>
+          </div>
+
+          <div class="config-row">
+            <label>Launch Arguments</label>
+            <input type="text" id="cfg-args" placeholder="-batchmode -nographics">
+            <span class="help">Additional command line arguments</span>
+          </div>
+
+          <div class="config-row">
+            <label>Auto-Start</label>
+            <label class="toggle">
+              <input type="checkbox" id="cfg-autostart" checked>
+              <span class="slider"></span>
+            </label>
+            <span class="help">Start server automatically after upload</span>
+          </div>
+
+          <button id="btn-save-config" class="btn-fire">
+            <span>SAVE CONFIG</span>
+          </button>
+        </div>
+
+        <div class="env-section">
+          <h3>ENVIRONMENT VARIABLES</h3>
+          <p class="help-text">Add custom environment variables for your game server</p>
+          <div id="env-list" class="env-list">
+            <!-- Populated by JS -->
+          </div>
+          <button id="btn-add-env" class="btn-small">+ ADD VARIABLE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div id="tab-logs" class="tab-content hidden">
+      <div class="logs-section">
+        <div class="logs-header">
+          <h2>SERVER LOGS</h2>
+          <div class="logs-actions">
+            <label class="toggle-label">
+              <input type="checkbox" id="log-autoscroll" checked>
+              Auto-scroll
+            </label>
+            <button id="btn-clear-logs" class="btn-small">CLEAR</button>
+            <button id="btn-download-logs" class="btn-small">DOWNLOAD</button>
+          </div>
+        </div>
+        <div id="log-output" class="log-output">
+          <div class="log-empty">No logs yet. Start your server to see output.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Tab -->
+    <div id="tab-info" class="tab-content hidden">
+      <div class="info-section">
+        <h2>SERVER INFORMATION</h2>
+
+        <div class="info-grid">
+          <div class="info-card">
+            <span class="info-label">Server ID</span>
+            <span id="info-id" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Game Name</span>
+            <span id="info-game" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Status</span>
+            <span id="info-status" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">IP Address</span>
+            <span id="info-ip" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Created</span>
+            <span id="info-created" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Expires</span>
+            <span id="info-expires" class="info-value">--</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Tier</span>
+            <span id="info-tier" class="info-value">Standard</span>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Resources</span>
+            <span id="info-resources" class="info-value">2 vCPU / 4GB RAM</span>
+          </div>
+        </div>
+
+        <div class="danger-zone">
+          <h3>DANGER ZONE</h3>
+          <button id="btn-factory-reset" class="btn-danger">FACTORY RESET</button>
+          <p class="help-text">Wipe all game files and reset to default state</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="panel-footer">
+      <span>Grotto Servers &bull; Need help? <a href="https://discord.gg/grotto" target="_blank">Join Discord</a></span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>
