@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grotto Airdropper - Token Distribution</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="airdropper.css">
+</head>
+<body>
+  <!-- Fire particles container -->
+  <div id="particles"></div>
+
+  <!-- Blood drip effect -->
+  <div class="blood-drips">
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+  </div>
+
+  <div class="container airdropper-container">
+    <div class="logo-container">
+      <h1 class="glitch-text" data-text="AIRDROPPER">AIRDROPPER</h1>
+    </div>
+    <p class="subtitle">TOKEN DISTRIBUTION TOOL</p>
+
+    <!-- Wallet Connection -->
+    <div id="wallet-section" class="wallet-section">
+      <div id="wallet-disconnected">
+        <button id="btn-connect-wallet" class="btn-fire">
+          <span>CONNECT WALLET</span>
+        </button>
+      </div>
+      <div id="wallet-connected" class="wallet-info-bar hidden">
+        <span id="wallet-address" class="wallet-addr"></span>
+        <button id="btn-disconnect" class="btn-small">DISCONNECT</button>
+      </div>
+    </div>
+
+    <!-- Main Airdropper Interface -->
+    <div id="airdropper-main" class="airdropper-main hidden">
+
+      <!-- Step 1: Snapshot Holders -->
+      <div class="airdrop-section" id="section-snapshot">
+        <div class="section-header">
+          <span class="step-number">1</span>
+          <h2>SNAPSHOT HOLDERS</h2>
+        </div>
+        <div class="section-content">
+          <div class="form-row">
+            <label>Contract Address to Snapshot</label>
+            <input type="text" id="snapshot-contract" placeholder="0x... (NFT or Token contract)">
+          </div>
+          <div class="form-row">
+            <label>Contract Type</label>
+            <select id="contract-type">
+              <option value="erc721">ERC-721 (NFT)</option>
+              <option value="erc20">ERC-20 (Token)</option>
+              <option value="erc1155">ERC-1155 (Multi-Token)</option>
+            </select>
+          </div>
+          <div class="form-row" id="token-id-row" style="display: none;">
+            <label>Token ID (for ERC-1155)</label>
+            <input type="text" id="erc1155-token-id" placeholder="Enter token ID">
+          </div>
+          <div class="button-row">
+            <button id="btn-snapshot" class="btn-fire">
+              <span>FETCH HOLDERS</span>
+            </button>
+            <span class="or-divider">OR</span>
+            <label class="btn-secondary btn-upload">
+              <input type="file" id="csv-upload" accept=".csv" style="display: none;">
+              UPLOAD CSV
+            </label>
+          </div>
+          <p class="hint">CSV format: address (one per line or comma-separated)</p>
+        </div>
+      </div>
+
+      <!-- Step 2: Review & Configure Amounts -->
+      <div class="airdrop-section hidden" id="section-configure">
+        <div class="section-header">
+          <span class="step-number">2</span>
+          <h2>CONFIGURE AMOUNTS</h2>
+        </div>
+        <div class="section-content">
+          <div class="stats-bar">
+            <div class="stat">
+              <span class="stat-label">HOLDERS</span>
+              <span class="stat-value" id="holder-count">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">TOTAL AMOUNT</span>
+              <span class="stat-value" id="total-amount">0</span>
+            </div>
+          </div>
+
+          <div class="amount-mode">
+            <button class="mode-btn active" data-mode="equal">EQUAL DISTRIBUTION</button>
+            <button class="mode-btn" data-mode="individual">INDIVIDUAL AMOUNTS</button>
+          </div>
+
+          <!-- Equal Distribution -->
+          <div id="equal-mode" class="mode-content">
+            <div class="form-row">
+              <label>Amount Per Holder</label>
+              <input type="number" id="equal-amount" placeholder="0.0" step="any" min="0">
+            </div>
+          </div>
+
+          <!-- Individual Amounts -->
+          <div id="individual-mode" class="mode-content hidden">
+            <div class="holders-table-wrapper">
+              <table class="holders-table">
+                <thead>
+                  <tr>
+                    <th>ADDRESS</th>
+                    <th>BALANCE</th>
+                    <th>AMOUNT</th>
+                  </tr>
+                </thead>
+                <tbody id="holders-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="btn-back-snapshot" class="btn-secondary">BACK</button>
+            <button id="btn-download-csv" class="btn-secondary">DOWNLOAD CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Select Token & Execute -->
+      <div class="airdrop-section hidden" id="section-execute">
+        <div class="section-header">
+          <span class="step-number">3</span>
+          <h2>SELECT TOKEN & EXECUTE</h2>
+        </div>
+        <div class="section-content">
+          <div class="form-row">
+            <label>Token to Airdrop</label>
+            <div class="token-selector" id="token-selector">
+              <div class="token-selected" id="token-selected" onclick="toggleTokenDropdown()">
+                <span class="token-placeholder">-- Select Token --</span>
+              </div>
+              <div class="token-dropdown hidden" id="token-dropdown">
+                <div class="token-option" data-value="native">
+                  <img class="token-icon" src="https://raw.githubusercontent.com/thegrotto/assets/main/tokens/heresy.png" alt="HERESY" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                  <span class="token-icon-fallback" style="display:none;">H</span>
+                  <div class="token-details">
+                    <span class="token-name">HERESY</span>
+                    <span class="token-label">Native Token</span>
+                  </div>
+                </div>
+                <div class="token-option" data-value="0x4CEE1f4b3808db3c6f47d521E2AB73c0A2126301">
+                  <img class="token-icon" src="https://raw.githubusercontent.com/thegrotto/assets/main/tokens/greg.png" alt="GREG" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                  <span class="token-icon-fallback" style="display:none;">G</span>
+                  <div class="token-details">
+                    <span class="token-name">$GREG</span>
+                    <span class="token-label">Greg Token</span>
+                  </div>
+                </div>
+                <div class="token-option" data-value="0x1FB721Afd78175B94a5E66AA8a46Fb024bDFBE39">
+                  <img class="token-icon" src="https://raw.githubusercontent.com/thegrotto/assets/main/tokens/npl.png" alt="NPL" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                  <span class="token-icon-fallback" style="display:none;">N</span>
+                  <div class="token-details">
+                    <span class="token-name">$NPL</span>
+                    <span class="token-label">Napoleon Token</span>
+                  </div>
+                </div>
+                <div class="token-option token-custom" data-value="custom">
+                  <span class="token-icon-fallback">+</span>
+                  <div class="token-details">
+                    <span class="token-name">Custom Token</span>
+                    <span class="token-label">Enter contract address</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <input type="hidden" id="token-select" value="">
+          </div>
+          <div class="form-row hidden" id="custom-token-row">
+            <label>Custom Token Address</label>
+            <input type="text" id="custom-token-address" placeholder="0x...">
+          </div>
+
+          <div class="token-info hidden" id="token-info">
+            <div class="info-row">
+              <span>Token:</span>
+              <span id="token-name">--</span>
+            </div>
+            <div class="info-row">
+              <span>Symbol:</span>
+              <span id="token-symbol">--</span>
+            </div>
+            <div class="info-row">
+              <span>Your Balance:</span>
+              <span id="token-balance">--</span>
+            </div>
+            <div class="info-row">
+              <span>Required:</span>
+              <span id="token-required">--</span>
+            </div>
+          </div>
+
+          <div class="approval-section hidden" id="approval-section">
+            <p class="warning-text">Token approval required before airdrop</p>
+            <button id="btn-approve" class="btn-fire btn-approve">
+              <span>APPROVE TOKEN</span>
+            </button>
+          </div>
+
+          <div class="summary-box" id="summary-box">
+            <h3>AIRDROP SUMMARY</h3>
+            <div class="summary-row">
+              <span>Recipients:</span>
+              <span id="summary-recipients">0</span>
+            </div>
+            <div class="summary-row">
+              <span>Total Amount:</span>
+              <span id="summary-total">0</span>
+            </div>
+            <div class="summary-row">
+              <span>Token:</span>
+              <span id="summary-token">--</span>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="btn-back-configure" class="btn-secondary">BACK</button>
+            <button id="btn-execute" class="btn-fire btn-execute" disabled>
+              <span>EXECUTE AIRDROP</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Not Connected Message -->
+    <div id="connect-prompt" class="connect-prompt">
+      <p>Connect your wallet to access the airdropper</p>
+    </div>
+  </div>
+
+  <!-- Transaction Modal -->
+  <div id="tx-modal" class="modal hidden">
+    <div class="modal-bg"></div>
+    <div class="modal-box">
+      <div id="tx-status">
+        <div class="spinner"></div>
+        <p id="tx-message">Processing...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom cursor -->
+  <div id="cursor" class="custom-cursor"></div>
+  <div id="cursor-trail"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="airdropper.js"></script>
+</body>
+</html>
