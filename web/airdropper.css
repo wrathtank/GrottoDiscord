@@ -7,8 +7,14 @@
   padding-bottom: 60px;
   padding-top: 80px;
   justify-content: flex-start;
+  align-items: center;
   min-height: auto;
   text-align: center;
+}
+
+.airdropper-container > * {
+  width: 100%;
+  max-width: 800px;
 }
 
 .airdropper-container .subtitle {
