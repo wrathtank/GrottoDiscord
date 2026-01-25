@@ -1,11 +1,20 @@
 /* Airdropper Page Styles */
 
 .airdropper-container {
+  width: 100%;
   max-width: 800px;
+  margin: 0 auto;
   padding-bottom: 60px;
   padding-top: 80px;
   justify-content: flex-start;
+  align-items: center;
   min-height: auto;
+  text-align: center;
+}
+
+.airdropper-container > * {
+  width: 100%;
+  max-width: 800px;
 }
 
 .airdropper-container .subtitle {
@@ -23,6 +32,8 @@
 /* Wallet */
 .wallet-section {
   margin-bottom: 25px;
+  display: flex;
+  justify-content: center;
 }
 
 .wallet-info {
@@ -124,6 +135,7 @@
   display: flex;
   flex-direction: column;
   gap: 25px;
+  text-align: left;
 }
 
 .airdropper-main.hidden {
