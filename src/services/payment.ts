@@ -24,6 +24,9 @@ interface TransferVerification {
   error?: string;
 }
 
+// Maximum age for a transaction to be considered valid (10 minutes)
+const MAX_TX_AGE_MS = 10 * 60 * 1000;
+
 // Verify a HERESY token transfer transaction
 export async function verifyHeresyTransfer(
   txHash: string,
@@ -43,6 +46,15 @@ export async function verifyHeresyTransfer(
 
     if (receipt.status !== 1) {
       return { verified: false, error: 'Transaction failed' };
+    }
+
+    // Verify transaction is recent (prevents replay of old transactions)
+    const block = await provider.getBlock(receipt.blockNumber);
+    if (block) {
+      const txAgeMs = Date.now() - (block.timestamp * 1000);
+      if (txAgeMs > MAX_TX_AGE_MS) {
+        return { verified: false, error: 'Transaction too old. Please submit a new payment.' };
+      }
     }
 
     // Look for Transfer event from HERESY token
