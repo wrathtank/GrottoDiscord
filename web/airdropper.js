@@ -51,11 +51,14 @@ const ERC721_ABI = [
   'function isApprovedForAll(address owner, address operator) view returns (bool)'
 ];
 
+// ABI for ThirdWeb Airdrop contract
+// _contents is an array of structs: { recipient: address, amount: uint256 }
 const AIRDROPPER_ABI = [
   'function owner() view returns (address)',
-  'function airdropERC20(address token, address[] recipients, uint256[] amounts) external payable',
-  'function airdropERC721(address nftContract, address[] recipients, uint256[] tokenIds) external',
-  'function airdropERC1155(address nftContract, address[] recipients, uint256[] tokenIds, uint256[] amounts) external'
+  'function airdropERC20(address _tokenAddress, tuple(address recipient, uint256 amount)[] _contents) external',
+  'function airdropERC721(address _tokenAddress, tuple(address recipient, uint256 tokenId)[] _contents) external',
+  'function airdropERC1155(address _tokenAddress, tuple(address recipient, uint256 tokenId, uint256 amount)[] _contents) external',
+  'function airdropNativeToken(tuple(address recipient, uint256 amount)[] _contents) external payable'
 ];
 
 // State
@@ -611,43 +614,41 @@ async function approveToken() {
 async function executeAirdrop() {
   if (!selectedToken || holders.length === 0) return;
 
-  // Filter holders with amounts > 0
-  const recipients = [];
-  const amounts = [];
+  // Build contents array: [{ recipient: address, amount: uint256 }, ...]
+  const contents = [];
   const decimals = selectedToken.decimals;
 
   for (const holder of holders) {
     if (holder.amount && parseFloat(holder.amount) > 0) {
-      recipients.push(holder.address);
-      amounts.push(ethers.utils.parseUnits(holder.amount, decimals));
+      contents.push({
+        recipient: holder.address,
+        amount: ethers.utils.parseUnits(holder.amount, decimals)
+      });
     }
   }
 
-  if (recipients.length === 0) {
+  if (contents.length === 0) {
     return alert('No amounts set. Please configure amounts for at least one holder.');
   }
 
   // Debug logging
   console.log('Airdrop params:', {
-    token: isNativeToken ? 'NATIVE (zero address)' : selectedToken.address,
-    recipients: recipients,
-    amounts: amounts.map(a => a.toString()),
-    recipientCount: recipients.length
+    token: isNativeToken ? 'NATIVE' : selectedToken.address,
+    contents: contents.map(c => ({ recipient: c.recipient, amount: c.amount.toString() })),
+    recipientCount: contents.length
   });
 
   showModal('Confirm transaction in wallet...');
 
   try {
     let tx;
-    const gasLimit = 100000 + (recipients.length * 50000); // Estimate gas based on recipient count
+    const gasLimit = 100000 + (contents.length * 60000); // Estimate gas based on recipient count
 
     if (isNativeToken) {
-      // For native token, we need to send value
-      const totalValue = amounts.reduce((a, b) => a.add(b), ethers.BigNumber.from(0));
-      tx = await airdropperContract.airdropERC20(
-        ethers.constants.AddressZero,
-        recipients,
-        amounts,
+      // For native token, use airdropNativeToken function
+      const totalValue = contents.reduce((sum, c) => sum.add(c.amount), ethers.BigNumber.from(0));
+      tx = await airdropperContract.airdropNativeToken(
+        contents,
         { value: totalValue, gasLimit }
       );
     } else {
@@ -673,8 +674,7 @@ async function executeAirdrop() {
 
       tx = await airdropperContract.airdropERC20(
         selectedToken.address,
-        recipients,
-        amounts,
+        contents,
         { gasLimit }
       );
     }
