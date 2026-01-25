@@ -52,6 +52,7 @@ const ERC721_ABI = [
 ];
 
 const AIRDROPPER_ABI = [
+  'function owner() view returns (address)',
   'function airdropERC20(address token, address[] recipients, uint256[] amounts) external payable',
   'function airdropERC721(address nftContract, address[] recipients, uint256[] tokenIds) external',
   'function airdropERC1155(address nftContract, address[] recipients, uint256[] tokenIds, uint256[] amounts) external'
@@ -64,6 +65,7 @@ let selectedToken = null;
 let isNativeToken = false;
 let tokenContract = null;
 let airdropperContract = null;
+let isContractOwner = false;
 
 // DOM helpers
 const $ = id => document.getElementById(id);
@@ -113,17 +115,57 @@ async function connectWallet() {
     // Initialize airdropper contract
     airdropperContract = new ethers.Contract(AIRDROPPER_CONTRACT, AIRDROPPER_ABI, signer);
 
+    // Check if user is contract owner
+    try {
+      const owner = await airdropperContract.owner();
+      isContractOwner = owner.toLowerCase() === walletAddress.toLowerCase();
+    } catch (e) {
+      console.error('Failed to check owner:', e);
+      isContractOwner = false;
+    }
+
     // Update UI
     $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
     $('wallet-disconnected').classList.add('hidden');
     $('wallet-connected').classList.remove('hidden');
-    $('airdropper-main').classList.remove('hidden');
-    $('connect-prompt').classList.add('hidden');
+
+    if (isContractOwner) {
+      $('airdropper-main').classList.remove('hidden');
+      $('connect-prompt').classList.add('hidden');
+      $('not-owner-prompt').classList.add('hidden');
+    } else {
+      $('airdropper-main').classList.add('hidden');
+      $('connect-prompt').classList.add('hidden');
+      $('not-owner-prompt').classList.remove('hidden');
+    }
 
     // Listen for account changes
-    eth.on('accountsChanged', accounts => {
-      if (accounts.length === 0) disconnectWallet();
-      else { walletAddress = accounts[0]; }
+    eth.on('accountsChanged', async (accounts) => {
+      if (accounts.length === 0) {
+        disconnectWallet();
+      } else {
+        // Re-connect with new account to re-check ownership
+        walletAddress = accounts[0];
+        signer = provider.getSigner();
+        airdropperContract = new ethers.Contract(AIRDROPPER_CONTRACT, AIRDROPPER_ABI, signer);
+
+        try {
+          const owner = await airdropperContract.owner();
+          isContractOwner = owner.toLowerCase() === walletAddress.toLowerCase();
+        } catch (e) {
+          isContractOwner = false;
+        }
+
+        $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
+
+        if (isContractOwner) {
+          $('airdropper-main').classList.remove('hidden');
+          $('not-owner-prompt').classList.add('hidden');
+        } else {
+          $('airdropper-main').classList.add('hidden');
+          $('not-owner-prompt').classList.remove('hidden');
+        }
+      }
     });
 
   } catch (e) {
@@ -134,9 +176,11 @@ async function connectWallet() {
 
 function disconnectWallet() {
   provider = signer = walletAddress = null;
+  isContractOwner = false;
   $('wallet-connected').classList.add('hidden');
   $('wallet-disconnected').classList.remove('hidden');
   $('airdropper-main').classList.add('hidden');
+  $('not-owner-prompt').classList.add('hidden');
   $('connect-prompt').classList.remove('hidden');
 }
 
