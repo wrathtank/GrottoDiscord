@@ -1,25 +1,42 @@
 /* Airdropper Page Styles */
 
 .airdropper-container {
-  max-width: 900px;
-  padding-top: 60px;
+  max-width: 800px;
+  padding-bottom: 60px;
+  padding-top: 80px;
   justify-content: flex-start;
-  min-height: 100vh;
+  min-height: auto;
 }
 
-.wallet-section {
+.airdropper-container .subtitle {
+  font-size: 0.7rem;
+  color: var(--red);
   margin-bottom: 30px;
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px var(--red);
 }
 
-.wallet-info-bar {
+.airdropper-container .glitch-text {
+  font-size: 2.5rem;
+}
+
+/* Wallet */
+.wallet-section {
+  margin-bottom: 25px;
+}
+
+.wallet-info {
   display: flex;
   align-items: center;
   gap: 15px;
   background: linear-gradient(145deg, var(--gray), var(--darker));
-  border: 1px solid var(--dark-red);
+  padding: 12px 18px;
   border-radius: 8px;
-  padding: 10px 20px;
+  border: 2px solid var(--dark-red);
+  box-shadow: 0 0 15px rgba(139, 0, 0, 0.3);
 }
+
+.wallet-info.hidden { display: none; }
 
 .wallet-addr {
   font-family: 'JetBrains Mono', monospace;
@@ -28,20 +45,77 @@
 }
 
 .btn-small {
-  padding: 8px 15px;
+  padding: 8px 14px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.5rem;
-  color: var(--white);
-  background: var(--gray);
-  border: 1px solid var(--dark-red);
+  font-size: 0.45rem;
+  color: #888;
+  background: transparent;
+  border: 1px solid #555;
   border-radius: 4px;
   cursor: none;
   transition: all 0.3s ease;
 }
 
 .btn-small:hover {
+  color: var(--red);
   border-color: var(--red);
-  box-shadow: 0 0 10px rgba(255, 0, 51, 0.4);
+  text-shadow: 0 0 5px var(--red);
+}
+
+/* Wallet Selector Modal */
+.wallet-selector-box {
+  max-width: 400px;
+  text-align: center;
+}
+
+.wallet-selector-box h3 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  color: var(--red);
+  margin-bottom: 25px;
+  text-shadow: 0 0 10px var(--red);
+}
+
+.wallet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wallet-option {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background: var(--darker);
+  border: 2px solid var(--blood);
+  border-radius: 8px;
+  cursor: none;
+  transition: all 0.3s ease;
+}
+
+.wallet-option:hover {
+  border-color: var(--red);
+  background: rgba(255, 0, 51, 0.1);
+  box-shadow: 0 0 15px rgba(255, 0, 51, 0.3);
+}
+
+.wallet-option img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.wallet-option span {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+  color: var(--white);
+}
+
+.btn-cancel {
+  width: 100%;
+  margin-top: 10px;
 }
 
 /* Main Interface */

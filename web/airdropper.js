@@ -66,6 +66,7 @@ let isNativeToken = false;
 let tokenContract = null;
 let airdropperContract = null;
 let isContractOwner = false;
+let currentEthProvider = null;
 
 // DOM helpers
 const $ = id => document.getElementById(id);
@@ -75,11 +76,64 @@ const $$ = sel => document.querySelectorAll(sel);
 // WALLET CONNECTION
 // ============================================
 
-async function connectWallet() {
-  try {
-    const eth = window.avalanche || window.ethereum;
-    if (!eth) return alert('Install MetaMask or Core Wallet');
+function showWalletModal() {
+  $('wallet-modal').classList.remove('hidden');
+}
 
+function closeWalletModal() {
+  $('wallet-modal').classList.add('hidden');
+}
+
+function getWalletProvider(walletType) {
+  // Check for specific wallet providers
+  if (walletType === 'metamask') {
+    // MetaMask injects as window.ethereum with isMetaMask
+    if (window.ethereum?.isMetaMask) return window.ethereum;
+    // Check providers array if multiple wallets installed
+    if (window.ethereum?.providers) {
+      return window.ethereum.providers.find(p => p.isMetaMask);
+    }
+    return null;
+  }
+
+  if (walletType === 'rabby') {
+    // Rabby injects as window.ethereum with isRabby
+    if (window.ethereum?.isRabby) return window.ethereum;
+    if (window.ethereum?.providers) {
+      return window.ethereum.providers.find(p => p.isRabby);
+    }
+    return null;
+  }
+
+  if (walletType === 'core') {
+    // Core/Avalanche wallet injects as window.avalanche
+    if (window.avalanche) return window.avalanche;
+    // Also check window.ethereum for Core
+    if (window.ethereum?.isAvalanche) return window.ethereum;
+    if (window.ethereum?.providers) {
+      return window.ethereum.providers.find(p => p.isAvalanche);
+    }
+    return null;
+  }
+
+  // Fallback to any available
+  return window.avalanche || window.ethereum;
+}
+
+async function connectWithWallet(walletType) {
+  closeWalletModal();
+
+  const eth = getWalletProvider(walletType);
+
+  if (!eth) {
+    const walletNames = { metamask: 'MetaMask', rabby: 'Rabby', core: 'Core Wallet' };
+    alert(`${walletNames[walletType] || 'Wallet'} not detected. Please install it first.`);
+    return;
+  }
+
+  currentEthProvider = eth;
+
+  try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' });
     walletAddress = accounts[0];
 
@@ -106,6 +160,8 @@ async function connectWallet() {
               blockExplorerUrls: ['https://grottoexplorer.xyz']
             }]
           });
+        } else {
+          throw e;
         }
       }
       provider = new ethers.providers.Web3Provider(eth);
@@ -652,8 +708,13 @@ function goBack(step) {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Wallet
-  $('btn-connect-wallet').onclick = connectWallet;
+  $('btn-connect-wallet').onclick = showWalletModal;
   $('btn-disconnect').onclick = disconnectWallet;
+
+  // Wallet selector options
+  $$('.wallet-option').forEach(opt => {
+    opt.onclick = () => connectWithWallet(opt.dataset.wallet);
+  });
 
   // Snapshot
   $('btn-snapshot').onclick = fetchHolders;

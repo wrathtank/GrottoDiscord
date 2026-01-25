@@ -36,7 +36,7 @@
           <span>CONNECT WALLET</span>
         </button>
       </div>
-      <div id="wallet-connected" class="wallet-info-bar hidden">
+      <div id="wallet-connected" class="wallet-info hidden">
         <span id="wallet-address" class="wallet-addr"></span>
         <button id="btn-disconnect" class="btn-small">DISCONNECT</button>
       </div>
@@ -256,6 +256,29 @@
         <p>Your wallet is not authorized to use this airdropper.</p>
         <p class="error-detail">Only the contract owner can execute airdrops.</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Wallet Selector Modal -->
+  <div id="wallet-modal" class="modal hidden">
+    <div class="modal-bg" onclick="closeWalletModal()"></div>
+    <div class="modal-box wallet-selector-box">
+      <h3>SELECT WALLET</h3>
+      <div class="wallet-options">
+        <button class="wallet-option" data-wallet="metamask">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" onerror="this.style.display='none'">
+          <span>MetaMask</span>
+        </button>
+        <button class="wallet-option" data-wallet="rabby">
+          <img src="https://rabby.io/assets/images/logo-rabby.svg" alt="Rabby" onerror="this.style.display='none'">
+          <span>Rabby</span>
+        </button>
+        <button class="wallet-option" data-wallet="core">
+          <img src="https://core.app/favicon.ico" alt="Core" onerror="this.style.display='none'">
+          <span>Core Wallet</span>
+        </button>
+      </div>
+      <button class="btn-secondary btn-cancel" onclick="closeWalletModal()">CANCEL</button>
     </div>
   </div>
 
