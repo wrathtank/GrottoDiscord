@@ -627,26 +627,55 @@ async function executeAirdrop() {
     return alert('No amounts set. Please configure amounts for at least one holder.');
   }
 
+  // Debug logging
+  console.log('Airdrop params:', {
+    token: isNativeToken ? 'NATIVE (zero address)' : selectedToken.address,
+    recipients: recipients,
+    amounts: amounts.map(a => a.toString()),
+    recipientCount: recipients.length
+  });
+
   showModal('Confirm transaction in wallet...');
 
   try {
     let tx;
+    const gasLimit = 100000 + (recipients.length * 50000); // Estimate gas based on recipient count
 
     if (isNativeToken) {
       // For native token, we need to send value
       const totalValue = amounts.reduce((a, b) => a.add(b), ethers.BigNumber.from(0));
       tx = await airdropperContract.airdropERC20(
-        ethers.constants.AddressZero, // Use zero address for native
+        ethers.constants.AddressZero,
         recipients,
         amounts,
-        { value: totalValue }
+        { value: totalValue, gasLimit }
       );
     } else {
-      // ERC20 airdrop
+      // ERC20 airdrop - verify approval first
+      const allowance = await tokenContract.allowance(walletAddress, AIRDROPPER_CONTRACT);
+      const totalRequired = calculateTotalRequired();
+
+      if (allowance.lt(totalRequired)) {
+        hideModal();
+        alert('Insufficient token approval. Please approve the tokens first.');
+        $('approval-section').classList.remove('hidden');
+        $('btn-execute').disabled = true;
+        return;
+      }
+
+      // Check balance
+      const balance = await tokenContract.balanceOf(walletAddress);
+      if (balance.lt(totalRequired)) {
+        hideModal();
+        alert('Insufficient token balance. You need ' + ethers.utils.formatUnits(totalRequired, decimals) + ' ' + selectedToken.symbol);
+        return;
+      }
+
       tx = await airdropperContract.airdropERC20(
         selectedToken.address,
         recipients,
-        amounts
+        amounts,
+        { gasLimit }
       );
     }
 
@@ -660,9 +689,20 @@ async function executeAirdrop() {
     }, 1500);
 
   } catch (e) {
-    console.error(e);
+    console.error('Airdrop error:', e);
     hideModal();
-    alert('Airdrop failed: ' + e.message);
+
+    // Parse error for better message
+    let errorMsg = e.message || 'Unknown error';
+    if (e.reason) errorMsg = e.reason;
+    if (e.error?.message) errorMsg = e.error.message;
+
+    // Check for common issues
+    if (errorMsg.includes('execution reverted')) {
+      errorMsg += '\n\nThe contract rejected the transaction. This could mean:\n- You are not the contract owner\n- Token not approved\n- Invalid parameters';
+    }
+
+    alert('Airdrop failed: ' + errorMsg);
   }
 }
 
