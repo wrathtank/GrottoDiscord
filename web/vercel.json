@@ -16,6 +16,10 @@
       "dest": "/panel.html"
     },
     {
+      "src": "/airdropper",
+      "dest": "/airdropper.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
