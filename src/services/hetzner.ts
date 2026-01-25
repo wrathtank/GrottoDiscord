@@ -115,6 +115,7 @@ write_files:
     content: |
       import express from 'express';
       import cors from 'cors';
+      import crypto from 'crypto';
       import { WebSocketServer, WebSocket } from 'ws';
       import { createServer } from 'http';
       import { v4 as uuidv4 } from 'uuid';
@@ -134,14 +135,16 @@ write_files:
       const REQUIRE_PWD = process.env.REQUIRE_LOBBY_PASSWORDS === 'true';
 
       interface Player { id: string; name: string; socket: WebSocket; lobbyId: string|null; token: string; isHost: boolean; }
-      interface Lobby { id: string; code: string; name: string; hostId: string; maxPlayers: number; isPublic: boolean; hasPassword: boolean; password: string|null; players: Map<string, Player>; createdAt: Date; }
+      interface Lobby { id: string; code: string; name: string; hostId: string; maxPlayers: number; isPublic: boolean; hasPassword: boolean; passwordHash: string|null; players: Map<string, Player>; createdAt: Date; }
 
       const players = new Map<string, Player>();
       const lobbies = new Map<string, Lobby>();
       const tokenToPlayer = new Map<string, string>();
 
-      function genCode(): string { const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)]; for(const l of lobbies.values())if(l.code===r)return genCode(); return r; }
+      function genCode(): string { const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const bytes=crypto.randomBytes(6); let r=''; for(let i=0;i<6;i++)r+=c[bytes[i]%c.length]; for(const l of lobbies.values())if(l.code===r)return genCode(); return r; }
       function genToken(): string { return uuidv4()+'-'+Date.now().toString(36); }
+      function hashPwd(p: string): string { return crypto.createHash('sha256').update(p).digest('hex'); }
+      function verifyPwd(input: string, hash: string): boolean { const inputHash=hashPwd(input); return crypto.timingSafeEqual(Buffer.from(inputHash),Buffer.from(hash)); }
       function lobbyJson(l: Lobby) { return { id:l.id, code:l.code, name:l.name, hostId:l.hostId, playerCount:l.players.size, maxPlayers:l.maxPlayers, isPublic:l.isPublic, hasPassword:l.hasPassword, players:Array.from(l.players.values()).map(p=>({id:p.id,name:p.name,isHost:p.isHost})) }; }
       function broadcast(l: Lobby, msg: any, exclude?: string) { const j=JSON.stringify(msg); for(const p of l.players.values()) if(p.id!==exclude && p.socket.readyState===WebSocket.OPEN) p.socket.send(j); }
 
@@ -156,7 +159,7 @@ write_files:
         if(REQUIRE_PWD && !password) return res.status(400).json({ success:false, error:'Password required' });
         if(!ALLOW_PUBLIC && isPublic) return res.status(400).json({ success:false, error:'Public lobbies disabled' });
         const lobbyId = uuidv4(), playerId = uuidv4(), token = genToken();
-        const lobby: Lobby = { id:lobbyId, code:genCode(), name:name.slice(0,32), hostId:playerId, maxPlayers:Math.min(Math.max(maxPlayers||8,2),MAX_PLAYERS), isPublic:isPublic!==false, hasPassword:!!password, password:password||null, players:new Map(), createdAt:new Date() };
+        const lobby: Lobby = { id:lobbyId, code:genCode(), name:name.slice(0,32), hostId:playerId, maxPlayers:Math.min(Math.max(maxPlayers||8,2),MAX_PLAYERS), isPublic:isPublic!==false, hasPassword:!!password, passwordHash:password?hashPwd(password):null, players:new Map(), createdAt:new Date() };
         lobbies.set(lobbyId, lobby);
         tokenToPlayer.set(token, playerId);
         res.json({ success:true, lobby:lobbyJson(lobby), playerId, token });
@@ -168,7 +171,7 @@ write_files:
         const lobby = Array.from(lobbies.values()).find(l=>l.code===code.toUpperCase());
         if(!lobby) return res.status(404).json({ success:false, error:'Not found' });
         if(lobby.players.size >= lobby.maxPlayers) return res.status(400).json({ success:false, error:'Full' });
-        if(lobby.hasPassword && lobby.password !== password) return res.status(403).json({ success:false, error:'Wrong password' });
+        if(lobby.hasPassword && lobby.passwordHash && !verifyPwd(password||'', lobby.passwordHash)) return res.status(403).json({ success:false, error:'Wrong password' });
         const playerId = uuidv4(), token = genToken();
         tokenToPlayer.set(token, playerId);
         res.json({ success:true, lobby:lobbyJson(lobby), playerId, token });
@@ -227,13 +230,14 @@ write_files:
       #!/bin/bash
       API="${process.env.API_URL || 'https://grotto-discord-bot-7dcd8c6451fc.herokuapp.com'}"
       SERVER_ID="${serverId}"
+      API_KEY="${apiKey}"
       while true; do
         HEALTH=$(curl -s http://localhost:${port}/health 2>/dev/null || echo '{}')
         PLAYERS=$(echo $HEALTH | grep -o '"players":[0-9]*' | grep -o '[0-9]*' || echo "0")
         LOBBIES=$(echo $HEALTH | grep -o '"lobbies":[0-9]*' | grep -o '[0-9]*' || echo "0")
         curl -s -X POST "$API/api/servers/$SERVER_ID/heartbeat" \\
           -H "Content-Type: application/json" \\
-          -d "{\\"currentPlayers\\": $PLAYERS, \\"lobbies\\": $LOBBIES, \\"status\\": \\"online\\"}" || true
+          -d "{\\"currentPlayers\\": $PLAYERS, \\"lobbies\\": $LOBBIES, \\"secret\\": \\"$API_KEY\\"}" || true
         sleep 60
       done
 

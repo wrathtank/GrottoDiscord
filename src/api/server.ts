@@ -45,8 +45,15 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
 
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
+      // In production, require origin header
+      // Only allow null origin in development for tools like Postman
+      if (!origin) {
+        const isDev = process.env.NODE_ENV !== 'production';
+        if (isDev) {
+          return callback(null, true);
+        }
+        return callback(new Error('Origin header required'));
+      }
 
       if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
         callback(null, true);
@@ -57,10 +64,8 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   }));
-
-  // Handle preflight requests
-  app.options('*', cors());
 
   app.use(express.json());
 
@@ -599,8 +604,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         return res.status(404).json({ success: false, error: 'Server not found.' });
       }
 
-      // TODO: Validate secret/auth token
-      // For now, just update the heartbeat
+      // Validate API key from server metadata
+      const expectedApiKey = server.metadata?.apiKey;
+      if (!expectedApiKey || secret !== expectedApiKey) {
+        return res.status(403).json({ success: false, error: 'Invalid API key.' });
+      }
 
       const { updateServerHeartbeat } = await import('../database/unified');
       await updateServerHeartbeat(id, currentPlayers || 0);
@@ -616,21 +624,66 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   // Server Panel Endpoints
   // ============================================
 
-  // Helper: verify ownership
-  async function verifyOwnership(serverId: string, wallet: string): Promise<boolean> {
+  // Helper: verify wallet signature for ownership proof
+  // Message format: "Grotto Server Action\nServer: {serverId}\nTimestamp: {timestamp}"
+  // Signature must be within 5 minutes to prevent replay attacks
+  function verifyWalletSignature(
+    wallet: string,
+    signature: string,
+    serverId: string,
+    timestamp: number
+  ): boolean {
+    // Check timestamp is within 5 minutes
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    if (Math.abs(now - timestamp) > fiveMinutes) {
+      console.warn(`[API] Signature expired: timestamp ${timestamp}, now ${now}`);
+      return false;
+    }
+
+    // Verify the signature
+    const message = `Grotto Server Action\nServer: ${serverId}\nTimestamp: ${timestamp}`;
+    return blockchain.verifySignature(message, signature, wallet);
+  }
+
+  // Helper: verify ownership with signature
+  async function verifyOwnershipWithSignature(
+    serverId: string,
+    wallet: string,
+    signature: string,
+    timestamp: number
+  ): Promise<{ valid: boolean; error?: string }> {
+    if (!wallet || !signature || !timestamp) {
+      return { valid: false, error: 'Missing wallet, signature, or timestamp' };
+    }
+
+    // Verify signature first
+    if (!verifyWalletSignature(wallet, signature, serverId, timestamp)) {
+      return { valid: false, error: 'Invalid or expired signature' };
+    }
+
+    // Then verify ownership
     const server = await getGameServer(serverId);
-    if (!server) return false;
-    return server.ownerId.toLowerCase() === wallet.toLowerCase();
+    if (!server) {
+      return { valid: false, error: 'Server not found' };
+    }
+
+    if (server.ownerId.toLowerCase() !== wallet.toLowerCase()) {
+      return { valid: false, error: 'Not the server owner' };
+    }
+
+    return { valid: true };
   }
 
   // Server control (start/stop/restart)
   app.post('/api/servers/:id/control', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { action, wallet } = req.body;
+      const { action, wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       if (!['start', 'stop', 'restart'].includes(action)) {
@@ -674,10 +727,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/config', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet, config } = req.body;
+      const { wallet, signature, timestamp, config } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       const server = await getGameServer(id);
@@ -703,10 +757,13 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     try {
       const { id } = req.params;
       const wallet = req.query.wallet as string;
+      const signature = req.query.signature as string;
+      const timestamp = parseInt(req.query.timestamp as string) || 0;
       const lines = parseInt(req.query.lines as string) || 100;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       // In production, fetch logs from Hetzner server via SSH
@@ -730,9 +787,12 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
     try {
       const { id } = req.params;
       const wallet = req.query.wallet as string;
+      const signature = req.query.signature as string;
+      const timestamp = parseInt(req.query.timestamp as string) || 0;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       // In production, check if game files exist on server
@@ -757,10 +817,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.delete('/api/servers/:id/game', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet } = req.body;
+      const { wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       // In production, SSH to server and delete game files
@@ -781,10 +842,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/settings', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet, settings } = req.body;
+      const { wallet, signature, timestamp, settings } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       const server = await getGameServer(id);
@@ -879,10 +941,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/kick-all', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet } = req.body;
+      const { wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       const server = await getGameServer(id);
@@ -924,10 +987,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/lobbies/:lobbyId/kick', async (req: Request, res: Response) => {
     try {
       const { id, lobbyId } = req.params;
-      const { wallet } = req.body;
+      const { wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       const server = await getGameServer(id);
@@ -965,10 +1029,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/regenerate-key', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet } = req.body;
+      const { wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       const server = await getGameServer(id);
@@ -1011,10 +1076,11 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
   app.post('/api/servers/:id/reset', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { wallet } = req.body;
+      const { wallet, signature, timestamp } = req.body;
 
-      if (!wallet || !await verifyOwnership(id, wallet)) {
-        return res.status(403).json({ success: false, error: 'Not authorized' });
+      const auth = await verifyOwnershipWithSignature(id, wallet, signature, timestamp);
+      if (!auth.valid) {
+        return res.status(403).json({ success: false, error: auth.error || 'Not authorized' });
       }
 
       // In production, SSH to server and reset to default state

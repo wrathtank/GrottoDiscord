@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grotto Servers</title>
+  <title>Grotto Servers - Dedicated Game Hosting</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -11,7 +11,17 @@
   <link rel="stylesheet" href="servers.css">
 </head>
 <body>
+  <!-- Fire particles container -->
   <div id="particles"></div>
+
+  <!-- Blood drip effect -->
+  <div class="blood-drips">
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+    <div class="drip"></div>
+  </div>
 
   <div class="container servers-container">
     <div class="logo-container">
@@ -126,6 +136,10 @@
       </div>
     </div>
   </div>
+
+  <!-- Custom cursor -->
+  <div id="cursor" class="custom-cursor"></div>
+  <div id="cursor-trail"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
   <script src="servers.js"></script>

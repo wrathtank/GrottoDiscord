@@ -262,4 +262,154 @@ $$('.modal-bg, .modal-close').forEach(el => el.onclick = () => {
 // Init
 document.addEventListener('DOMContentLoaded', () => {
   loadServers();
+  initVisualEffects();
 });
+
+// ============================================
+// VISUAL EFFECTS
+// ============================================
+
+function initVisualEffects() {
+  // Custom fire cursor
+  const cursor = document.getElementById('cursor');
+  let mouseX = 0, mouseY = 0;
+  let cursorX = 0, cursorY = 0;
+
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+  });
+
+  function animateCursor() {
+    cursorX += (mouseX - cursorX) * 0.15;
+    cursorY += (mouseY - cursorY) * 0.15;
+    if (cursor) {
+      cursor.style.left = cursorX + 'px';
+      cursor.style.top = cursorY + 'px';
+    }
+    requestAnimationFrame(animateCursor);
+  }
+  animateCursor();
+
+  // Create fire particles on cursor
+  function createCursorParticle() {
+    const particle = document.createElement('div');
+    particle.className = 'cursor-particle';
+    particle.style.cssText = `
+      position: fixed;
+      width: ${Math.random() * 6 + 2}px;
+      height: ${Math.random() * 6 + 2}px;
+      background: ${Math.random() > 0.5 ? '#ff0033' : '#ff6600'};
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      left: ${cursorX}px;
+      top: ${cursorY}px;
+      opacity: 1;
+      transition: all 0.5s ease-out;
+    `;
+    document.body.appendChild(particle);
+
+    setTimeout(() => {
+      particle.style.transform = `translate(${(Math.random() - 0.5) * 50}px, ${-Math.random() * 50 - 20}px)`;
+      particle.style.opacity = '0';
+    }, 10);
+
+    setTimeout(() => particle.remove(), 500);
+  }
+  setInterval(createCursorParticle, 50);
+
+  // Click/hold particle burst effect
+  let clickParticleInterval = null;
+
+  function createClickParticle() {
+    const colors = ['#ff0033', '#ff6600', '#ffcc00', '#ff4400', '#ff8800'];
+    const particle = document.createElement('div');
+    const size = Math.random() * 4 + 2;
+    particle.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      left: ${cursorX}px;
+      top: ${cursorY}px;
+      opacity: 1;
+      box-shadow: 0 0 ${size}px currentColor;
+    `;
+    document.body.appendChild(particle);
+
+    const angle = Math.random() * Math.PI * 2;
+    const velocity = Math.random() * 80 + 40;
+    const vx = Math.cos(angle) * velocity;
+    const vy = Math.sin(angle) * velocity;
+
+    let x = 0, y = 0, opacity = 1;
+    const animate = () => {
+      x += vx * 0.02;
+      y += vy * 0.02 + 1;
+      opacity -= 0.03;
+      particle.style.transform = `translate(${x}px, ${y}px)`;
+      particle.style.opacity = opacity;
+      if (opacity > 0) {
+        requestAnimationFrame(animate);
+      } else {
+        particle.remove();
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  function startClickParticles() {
+    for (let i = 0; i < 8; i++) createClickParticle();
+    clickParticleInterval = setInterval(() => {
+      for (let i = 0; i < 3; i++) createClickParticle();
+    }, 30);
+  }
+
+  function stopClickParticles() {
+    if (clickParticleInterval) {
+      clearInterval(clickParticleInterval);
+      clickParticleInterval = null;
+    }
+  }
+
+  document.addEventListener('mousedown', startClickParticles);
+  document.addEventListener('mouseup', stopClickParticles);
+  document.addEventListener('mouseleave', stopClickParticles);
+
+  // Background particles
+  const particlesContainer = document.getElementById('particles');
+  function createParticle() {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    particle.style.left = Math.random() * 100 + '%';
+    particle.style.animationDuration = (Math.random() * 2 + 2) + 's';
+    particle.style.animationDelay = Math.random() * 2 + 's';
+    particlesContainer.appendChild(particle);
+    setTimeout(() => particle.remove(), 5000);
+  }
+  setInterval(createParticle, 200);
+
+  // Glitch effect on hover for fire buttons
+  document.querySelectorAll('.btn-fire').forEach(btn => {
+    btn.addEventListener('mouseenter', () => {
+      btn.style.animation = 'glitch 0.3s infinite';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.animation = '';
+    });
+  });
+
+  // Random screen flicker effect
+  function screenFlicker() {
+    if (Math.random() > 0.97) {
+      document.body.style.opacity = '0.8';
+      setTimeout(() => document.body.style.opacity = '1', 50);
+    }
+    setTimeout(screenFlicker, 100);
+  }
+  screenFlicker();
+}
