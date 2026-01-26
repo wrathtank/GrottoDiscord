@@ -52,6 +52,35 @@
           <h2>SNAPSHOT HOLDERS</h2>
         </div>
         <div class="section-content">
+          <!-- Search for Games/Assets/Packs -->
+          <div class="search-section">
+            <label>Search Games, Assets & Packs</label>
+            <div class="search-bar">
+              <input type="text" id="grotto-search" placeholder="Search by name...">
+              <button id="btn-search" class="btn-fire btn-search">
+                <span>SEARCH</span>
+              </button>
+            </div>
+            <div class="search-filters">
+              <label class="filter-checkbox">
+                <input type="checkbox" id="filter-games" checked> Games
+              </label>
+              <label class="filter-checkbox">
+                <input type="checkbox" id="filter-assets" checked> Assets
+              </label>
+              <label class="filter-checkbox">
+                <input type="checkbox" id="filter-packs" checked> Packs
+              </label>
+            </div>
+            <div id="search-results" class="search-results hidden">
+              <div id="search-results-list"></div>
+            </div>
+          </div>
+
+          <div class="divider-or">
+            <span>OR ENTER CONTRACT DIRECTLY</span>
+          </div>
+
           <div class="form-row">
             <label>Contract Address to Snapshot</label>
             <input type="text" id="snapshot-contract" placeholder="0x... (NFT or Token contract)">

@@ -3,6 +3,7 @@
 const GROTTO_CHAIN_ID = 36463;
 const GROTTO_RPC = 'https://rpc.grotto.network';
 const GROTTO_EXPLORER_API = 'https://grottoexplorer.xyz/api/v2';
+const GROTTO_API = 'https://api.enterthegrotto.xyz';
 
 // Airdropper Contract (EIP-1167 proxy)
 const AIRDROPPER_CONTRACT = '0xc71b2Bfb7B6532E1e3e148CD8bd064b2D85eaf7f';
@@ -241,6 +242,146 @@ function disconnectWallet() {
   $('airdropper-main').classList.add('hidden');
   $('not-owner-prompt').classList.add('hidden');
   $('connect-prompt').classList.remove('hidden');
+}
+
+// ============================================
+// GROTTO SEARCH
+// ============================================
+
+async function searchGrotto() {
+  const query = $('grotto-search').value.trim();
+  if (query.length < 2) {
+    return alert('Enter at least 2 characters to search');
+  }
+
+  // Get selected types
+  const types = [];
+  if ($('filter-games').checked) types.push('games');
+  if ($('filter-assets').checked) types.push('assets');
+  if ($('filter-packs').checked) types.push('packs');
+
+  if (types.length === 0) {
+    return alert('Select at least one type to search');
+  }
+
+  const resultsContainer = $('search-results');
+  const resultsList = $('search-results-list');
+
+  resultsContainer.classList.remove('hidden');
+  resultsList.innerHTML = '<div class="search-loading">Searching...</div>';
+
+  try {
+    const url = `${GROTTO_API}/api/search/detailed?q=${encodeURIComponent(query)}&types=${types.join(',')}&limit=20`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error('Search failed');
+    }
+
+    const data = await response.json();
+
+    // Combine all results
+    const allResults = [
+      ...(data.games || []).map(r => ({ ...r, type: 'game' })),
+      ...(data.assets || []).map(r => ({ ...r, type: 'asset' })),
+      ...(data.packs || []).map(r => ({ ...r, type: 'pack' }))
+    ];
+
+    if (allResults.length === 0) {
+      resultsList.innerHTML = '<div class="search-no-results">No results found</div>';
+      return;
+    }
+
+    renderSearchResults(allResults);
+
+  } catch (e) {
+    console.error('Search error:', e);
+    resultsList.innerHTML = '<div class="search-no-results">Search failed. Try again.</div>';
+  }
+}
+
+function renderSearchResults(results) {
+  const resultsList = $('search-results-list');
+  resultsList.innerHTML = '';
+
+  for (const item of results) {
+    const div = document.createElement('div');
+    div.className = 'search-result-item';
+    div.onclick = () => selectSearchResult(item);
+
+    // Get contract address based on type
+    let contractAddr = '';
+    let tokenId = '';
+    if (item.type === 'game') {
+      contractAddr = item.license_address || item.token_address || '';
+      tokenId = item.license_token_id || '';
+    } else {
+      contractAddr = item.collection_address || '';
+      tokenId = item.token_id || '';
+    }
+
+    div.innerHTML = `
+      <img class="search-result-thumb" src="${item.thumbnail_url || ''}" alt="" onerror="this.style.display='none'">
+      <div class="search-result-info">
+        <div class="search-result-name">${escapeHtml(item.name)}</div>
+        <div class="search-result-meta">
+          <span class="search-result-type">${item.type}</span>
+          ${contractAddr ? `<span>${contractAddr.slice(0, 8)}...${contractAddr.slice(-6)}</span>` : ''}
+          ${tokenId ? `<span>ID: ${tokenId}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    resultsList.appendChild(div);
+  }
+}
+
+function selectSearchResult(item) {
+  // Get contract address based on type
+  let contractAddr = '';
+  let tokenId = '';
+  let contractType = 'erc1155'; // Most Grotto items are ERC1155
+
+  if (item.type === 'game') {
+    contractAddr = item.license_address || item.token_address || '';
+    tokenId = item.license_token_id || '0';
+  } else {
+    contractAddr = item.collection_address || '';
+    tokenId = item.token_id || '';
+  }
+
+  if (!contractAddr) {
+    alert('No contract address found for this item');
+    return;
+  }
+
+  // Fill in the form
+  $('snapshot-contract').value = contractAddr;
+  $('contract-type').value = contractType;
+
+  // Show and fill token ID for ERC1155
+  if (tokenId) {
+    $('token-id-row').style.display = 'block';
+    $('erc1155-token-id').value = tokenId;
+  }
+
+  // Hide search results
+  $('search-results').classList.add('hidden');
+
+  // Clear search
+  $('grotto-search').value = '';
+
+  // Visual feedback
+  $('snapshot-contract').style.borderColor = 'var(--red)';
+  setTimeout(() => {
+    $('snapshot-contract').style.borderColor = '';
+  }, 1000);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // ============================================
@@ -755,6 +896,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $$('.wallet-option').forEach(opt => {
     opt.onclick = () => connectWithWallet(opt.dataset.wallet);
   });
+
+  // Grotto Search
+  $('btn-search').onclick = searchGrotto;
+  $('grotto-search').onkeypress = (e) => {
+    if (e.key === 'Enter') searchGrotto();
+  };
 
   // Snapshot
   $('btn-snapshot').onclick = fetchHolders;
