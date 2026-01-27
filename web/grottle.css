@@ -384,8 +384,11 @@ body {
 }
 
 .key:hover {
-  background: #4a4a4a;
   transform: scale(1.05);
+}
+
+.key:not(.correct):not(.present):not(.absent):hover {
+  background: #4a4a4a;
 }
 
 .key:active {
@@ -398,17 +401,23 @@ body {
 }
 
 .key.correct {
-  background: var(--red);
+  background: var(--red) !important;
+  color: var(--white) !important;
   box-shadow: 0 0 10px var(--red);
+  border: 1px solid var(--red);
 }
 
 .key.present {
-  background: var(--yellow);
+  background: var(--yellow) !important;
+  color: #1a1a1a !important;
+  box-shadow: 0 0 8px var(--yellow);
+  border: 1px solid var(--yellow);
 }
 
 .key.absent {
-  background: #2a2a2a;
-  color: #666;
+  background: #3a3a3a !important;
+  color: #555 !important;
+  opacity: 0.6;
 }
 
 /* Modal */
