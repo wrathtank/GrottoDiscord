@@ -797,8 +797,15 @@ function revealTiles(result) {
 
 function updateKeyboard(letter, status) {
   // Convert to uppercase to match keyboard data-key attributes
-  const key = document.querySelector(`.key[data-key="${letter.toUpperCase()}"]`);
-  if (!key) return;
+  const upperLetter = letter.toUpperCase();
+  const key = document.querySelector(`.key[data-key="${upperLetter}"]`);
+
+  console.log('updateKeyboard:', upperLetter, status, key); // Debug
+
+  if (!key) {
+    console.log('Key not found for:', upperLetter);
+    return;
+  }
 
   // Only upgrade status (absent -> present -> correct)
   if (status === 'correct') {
@@ -810,6 +817,8 @@ function updateKeyboard(letter, status) {
   } else if (status === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
     key.classList.add('absent');
   }
+
+  console.log('Key classes after update:', key.className); // Debug
 }
 
 function showMessage(text) {

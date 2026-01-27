@@ -104,21 +104,23 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  min-height: 100vh;
-  padding: 5px 15px;
+  height: 100vh;
+  max-height: 100vh;
+  padding: 1vh 15px;
   max-width: 500px;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 /* Logo */
 .logo-container {
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 /* Glitch text effect */
 .glitch-text {
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 3vh, 1.4rem);
   font-weight: 900;
   color: var(--white);
   text-shadow: var(--glow);
@@ -177,41 +179,41 @@ body {
 }
 
 .subtitle {
-  font-size: 0.45rem;
+  font-size: clamp(0.35rem, 1vh, 0.45rem);
   color: var(--red);
   letter-spacing: 4px;
-  margin-bottom: 4px;
+  margin-bottom: 0.5vh;
   text-shadow: 0 0 10px var(--red);
 }
 
 /* Game Stats */
 .game-stats {
   display: flex;
-  gap: 12px;
-  margin-bottom: 6px;
-  padding: 4px 12px;
+  gap: 10px;
+  margin-bottom: 1vh;
+  padding: 0.5vh 10px;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--blood);
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 0;
 }
 
 .stat-value {
   font-family: 'Orbitron', sans-serif;
-  font-size: 0.8rem;
+  font-size: clamp(0.6rem, 2vh, 0.8rem);
   font-weight: 700;
   color: var(--red);
   text-shadow: 0 0 10px var(--red);
 }
 
 .stat-label {
-  font-size: 0.35rem;
+  font-size: clamp(0.25rem, 0.8vh, 0.35rem);
   color: #666;
   letter-spacing: 1px;
 }
@@ -220,24 +222,24 @@ body {
 .game-board {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 0.5vh;
+  margin-bottom: 1vh;
 }
 
 .board-row {
   display: flex;
-  gap: 4px;
+  gap: 0.5vh;
 }
 
 .tile {
-  width: 42px;
-  height: 42px;
+  width: clamp(32px, 7vh, 48px);
+  height: clamp(32px, 7vh, 48px);
   border: 2px solid var(--tile-gray);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.3rem;
+  font-size: clamp(0.9rem, 3vh, 1.3rem);
   font-weight: 700;
   color: var(--white);
   text-transform: uppercase;
@@ -355,7 +357,7 @@ body {
 .keyboard {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 0.5vh;
   width: 100%;
   max-width: 500px;
 }
@@ -363,19 +365,19 @@ body {
 .keyboard-row {
   display: flex;
   justify-content: center;
-  gap: 3px;
+  gap: 0.4vh;
 }
 
 .key {
-  min-width: 26px;
-  height: 32px;
-  padding: 0 6px;
+  min-width: clamp(22px, 5vw, 30px);
+  height: clamp(24px, 5vh, 36px);
+  padding: 0 4px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--gray);
   color: var(--white);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.4rem;
+  font-size: clamp(0.3rem, 1vh, 0.45rem);
   cursor: none;
   transition: all 0.2s ease;
   display: flex;
@@ -393,22 +395,24 @@ body {
 }
 
 .key-wide {
-  min-width: 42px;
-  font-size: 0.35rem;
+  min-width: clamp(36px, 9vw, 50px);
+  font-size: clamp(0.25rem, 0.9vh, 0.35rem);
 }
 
 .key.correct {
-  background: var(--red);
-  box-shadow: 0 0 10px var(--red);
+  background: var(--red) !important;
+  box-shadow: 0 0 10px var(--red) !important;
 }
 
 .key.present {
-  background: var(--yellow);
+  background: var(--yellow) !important;
+  box-shadow: 0 0 8px var(--yellow) !important;
 }
 
 .key.absent {
-  background: #2a2a2a;
-  color: #666;
+  background: #1a1a1a !important;
+  color: #444 !important;
+  opacity: 0.6;
 }
 
 /* Modal */
