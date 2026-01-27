@@ -1,36 +1,38 @@
 // Grotto Airdropper - Token Distribution Tool
 
-const GROTTO_CHAIN_ID = 36463;
-const GROTTO_RPC = 'https://rpc.grotto.network';
-const GROTTO_EXPLORER_API = 'https://grottoexplorer.xyz/api/v2';
-const GROTTO_API = 'https://api.enterthegrotto.xyz';
-
-// Airdropper Contract (EIP-1167 proxy)
-const AIRDROPPER_CONTRACT = '0xc71b2Bfb7B6532E1e3e148CD8bd064b2D85eaf7f';
-
-// Preset Tokens with icons
-// Icons can be updated with actual URLs when available
-const PRESET_TOKENS = {
-  'native': {
-    name: 'HERESY',
-    symbol: 'HERESY',
-    decimals: 18,
-    address: null,
-    icon: 'https://raw.githubusercontent.com/thegrotto/assets/main/tokens/heresy.png'
+// Chain configurations
+const CHAINS = {
+  grotto: {
+    name: 'The Grotto L1',
+    chainId: 36463,
+    rpc: 'https://rpc.grotto.network',
+    explorerApi: 'https://grottoexplorer.xyz/api/v2',
+    explorer: 'https://grottoexplorer.xyz',
+    nativeCurrency: { name: 'HERESY', symbol: 'HERESY', decimals: 18 },
+    airdropperContract: '0xc71b2Bfb7B6532E1e3e148CD8bd064b2D85eaf7f', // Will be updated when deployed
+    presetTokens: {
+      'native': { name: 'HERESY', symbol: 'HERESY', decimals: 18, address: null },
+      '0x4CEE1f4b3808db3c6f47d521E2AB73c0A2126301': { name: 'Greg', symbol: 'GREG', decimals: 18 },
+      '0x1FB721Afd78175B94a5E66AA8a46Fb024bDFBE39': { name: 'NAPOLEON', symbol: 'NPL', decimals: 18 }
+    }
   },
-  '0x4CEE1f4b3808db3c6f47d521E2AB73c0A2126301': {
-    name: 'Greg',
-    symbol: 'GREG',
-    decimals: 18,
-    icon: 'https://raw.githubusercontent.com/thegrotto/assets/main/tokens/greg.png'
-  },
-  '0x1FB721Afd78175B94a5E66AA8a46Fb024bDFBE39': {
-    name: 'NAPOLEON',
-    symbol: 'NPL',
-    decimals: 18,
-    icon: 'https://raw.githubusercontent.com/thegrotto/assets/main/tokens/npl.png'
+  avax: {
+    name: 'Avalanche C-Chain',
+    chainId: 43114,
+    rpc: 'https://api.avax.network/ext/bc/C/rpc',
+    explorerApi: 'https://api.snowtrace.io/api',
+    explorer: 'https://snowtrace.io',
+    nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
+    airdropperContract: '', // Will be set when user deploys
+    presetTokens: {
+      'native': { name: 'AVAX', symbol: 'AVAX', decimals: 18, address: null }
+    }
   }
 };
+
+// Current chain (default to Grotto)
+let currentChain = 'grotto';
+const GROTTO_API = 'https://api.enterthegrotto.xyz';
 
 // ABIs
 const ERC20_ABI = [
@@ -52,14 +54,14 @@ const ERC721_ABI = [
   'function isApprovedForAll(address owner, address operator) view returns (bool)'
 ];
 
-// ABI for ThirdWeb Airdrop contract
-// _contents is an array of structs: { recipient: address, amount: uint256 }
+// ABI for OpenAirdropper contract (permissionless)
 const AIRDROPPER_ABI = [
-  'function owner() view returns (address)',
   'function airdropERC20(address _tokenAddress, tuple(address recipient, uint256 amount)[] _contents) external',
   'function airdropERC721(address _tokenAddress, tuple(address recipient, uint256 tokenId)[] _contents) external',
   'function airdropERC1155(address _tokenAddress, tuple(address recipient, uint256 tokenId, uint256 amount)[] _contents) external',
-  'function airdropNativeToken(tuple(address recipient, uint256 amount)[] _contents) external payable'
+  'function airdropNativeToken(tuple(address recipient, uint256 amount)[] _contents) external payable',
+  'function airdropERC20Equal(address _tokenAddress, address[] _recipients, uint256 _amountEach) external',
+  'function airdropNativeTokenEqual(address[] _recipients, uint256 _amountEach) external payable'
 ];
 
 // State
@@ -69,12 +71,107 @@ let selectedToken = null;
 let isNativeToken = false;
 let tokenContract = null;
 let airdropperContract = null;
-let isContractOwner = false;
 let currentEthProvider = null;
 
 // DOM helpers
 const $ = id => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
+
+// Helper to get current chain config
+function getChainConfig() {
+  return CHAINS[currentChain];
+}
+
+// ============================================
+// CHAIN SWITCHING
+// ============================================
+
+async function switchChain(chainKey) {
+  currentChain = chainKey;
+  const chain = getChainConfig();
+
+  // Update UI
+  $('selected-chain').textContent = chain.name;
+  updatePresetTokens();
+
+  // If wallet connected, switch chain
+  if (currentEthProvider && walletAddress) {
+    try {
+      await currentEthProvider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x' + chain.chainId.toString(16) }]
+      });
+    } catch (e) {
+      if (e.code === 4902) {
+        await currentEthProvider.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x' + chain.chainId.toString(16),
+            chainName: chain.name,
+            nativeCurrency: chain.nativeCurrency,
+            rpcUrls: [chain.rpc],
+            blockExplorerUrls: [chain.explorer]
+          }]
+        });
+      }
+    }
+
+    // Reinitialize provider and contract
+    provider = new ethers.providers.Web3Provider(currentEthProvider);
+    signer = provider.getSigner();
+
+    if (chain.airdropperContract) {
+      airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
+    }
+  }
+
+  // Close dropdown
+  $('chain-dropdown').classList.add('hidden');
+}
+
+function updatePresetTokens() {
+  const chain = getChainConfig();
+  const dropdown = $('token-dropdown');
+  if (!dropdown) return;
+
+  // Clear existing options except custom
+  const customOption = dropdown.querySelector('.token-custom');
+  dropdown.innerHTML = '';
+
+  // Add preset tokens for current chain
+  for (const [addr, token] of Object.entries(chain.presetTokens)) {
+    const div = document.createElement('div');
+    div.className = 'token-option';
+    div.dataset.value = addr;
+    div.onclick = () => selectToken(addr, div);
+    div.innerHTML = `
+      <span class="token-icon-fallback">${token.symbol[0]}</span>
+      <div class="token-details">
+        <span class="token-name">${token.symbol}</span>
+        <span class="token-label">${token.name}</span>
+      </div>
+    `;
+    dropdown.appendChild(div);
+  }
+
+  // Re-add custom option
+  const customDiv = document.createElement('div');
+  customDiv.className = 'token-option token-custom';
+  customDiv.dataset.value = 'custom';
+  customDiv.onclick = () => selectToken('custom', customDiv);
+  customDiv.innerHTML = `
+    <span class="token-icon-fallback">+</span>
+    <div class="token-details">
+      <span class="token-name">Custom Token</span>
+      <span class="token-label">Enter contract address</span>
+    </div>
+  `;
+  dropdown.appendChild(customDiv);
+
+  // Reset selection
+  $('token-selected').innerHTML = '<span class="token-placeholder">-- Select Token --</span>';
+  $('token-select').value = '';
+}
 
 // ============================================
 // WALLET CONNECTION
@@ -136,6 +233,7 @@ async function connectWithWallet(walletType) {
   }
 
   currentEthProvider = eth;
+  const chain = getChainConfig();
 
   try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' });
@@ -144,24 +242,24 @@ async function connectWithWallet(walletType) {
     provider = new ethers.providers.Web3Provider(eth);
     signer = provider.getSigner();
 
-    // Switch to Grotto if needed
+    // Switch to selected chain if needed
     const network = await provider.getNetwork();
-    if (network.chainId !== GROTTO_CHAIN_ID) {
+    if (network.chainId !== chain.chainId) {
       try {
         await eth.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x' + GROTTO_CHAIN_ID.toString(16) }]
+          params: [{ chainId: '0x' + chain.chainId.toString(16) }]
         });
       } catch (e) {
         if (e.code === 4902) {
           await eth.request({
             method: 'wallet_addEthereumChain',
             params: [{
-              chainId: '0x' + GROTTO_CHAIN_ID.toString(16),
-              chainName: 'The Grotto L1',
-              nativeCurrency: { name: 'HERESY', symbol: 'HERESY', decimals: 18 },
-              rpcUrls: [GROTTO_RPC],
-              blockExplorerUrls: ['https://grottoexplorer.xyz']
+              chainId: '0x' + chain.chainId.toString(16),
+              chainName: chain.name,
+              nativeCurrency: chain.nativeCurrency,
+              rpcUrls: [chain.rpc],
+              blockExplorerUrls: [chain.explorer]
             }]
           });
         } else {
@@ -172,60 +270,37 @@ async function connectWithWallet(walletType) {
       signer = provider.getSigner();
     }
 
-    // Initialize airdropper contract
-    airdropperContract = new ethers.Contract(AIRDROPPER_CONTRACT, AIRDROPPER_ABI, signer);
-
-    // Check if user is contract owner
-    try {
-      const owner = await airdropperContract.owner();
-      isContractOwner = owner.toLowerCase() === walletAddress.toLowerCase();
-    } catch (e) {
-      console.error('Failed to check owner:', e);
-      isContractOwner = false;
+    // Initialize airdropper contract (permissionless - no owner check needed)
+    if (chain.airdropperContract) {
+      airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
     }
 
-    // Update UI
+    // Update UI - permissionless, so always show main interface
     $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
     $('wallet-disconnected').classList.add('hidden');
     $('wallet-connected').classList.remove('hidden');
-
-    if (isContractOwner) {
-      $('airdropper-main').classList.remove('hidden');
-      $('connect-prompt').classList.add('hidden');
-      $('not-owner-prompt').classList.add('hidden');
-    } else {
-      $('airdropper-main').classList.add('hidden');
-      $('connect-prompt').classList.add('hidden');
-      $('not-owner-prompt').classList.remove('hidden');
-    }
+    $('airdropper-main').classList.remove('hidden');
+    $('connect-prompt').classList.add('hidden');
+    $('not-owner-prompt').classList.add('hidden');
 
     // Listen for account changes
     eth.on('accountsChanged', async (accounts) => {
       if (accounts.length === 0) {
         disconnectWallet();
       } else {
-        // Re-connect with new account to re-check ownership
         walletAddress = accounts[0];
         signer = provider.getSigner();
-        airdropperContract = new ethers.Contract(AIRDROPPER_CONTRACT, AIRDROPPER_ABI, signer);
-
-        try {
-          const owner = await airdropperContract.owner();
-          isContractOwner = owner.toLowerCase() === walletAddress.toLowerCase();
-        } catch (e) {
-          isContractOwner = false;
+        if (chain.airdropperContract) {
+          airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
         }
-
         $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
-
-        if (isContractOwner) {
-          $('airdropper-main').classList.remove('hidden');
-          $('not-owner-prompt').classList.add('hidden');
-        } else {
-          $('airdropper-main').classList.add('hidden');
-          $('not-owner-prompt').classList.remove('hidden');
-        }
       }
+    });
+
+    // Listen for chain changes
+    eth.on('chainChanged', (chainId) => {
+      // Reload to reset state
+      window.location.reload();
     });
 
   } catch (e) {
@@ -236,11 +311,9 @@ async function connectWithWallet(walletType) {
 
 function disconnectWallet() {
   provider = signer = walletAddress = null;
-  isContractOwner = false;
   $('wallet-connected').classList.add('hidden');
   $('wallet-disconnected').classList.remove('hidden');
   $('airdropper-main').classList.add('hidden');
-  $('not-owner-prompt').classList.add('hidden');
   $('connect-prompt').classList.remove('hidden');
 }
 
@@ -391,6 +464,7 @@ function escapeHtml(text) {
 async function fetchHolders() {
   const contractAddr = $('snapshot-contract').value.trim();
   const contractType = $('contract-type').value;
+  const chain = getChainConfig();
 
   if (!contractAddr || !ethers.utils.isAddress(contractAddr)) {
     return alert('Enter a valid contract address');
@@ -399,8 +473,8 @@ async function fetchHolders() {
   showModal('Fetching holders...');
 
   try {
-    // Use Blockscout V2 API
-    const response = await fetch(`${GROTTO_EXPLORER_API}/tokens/${contractAddr}/holders?limit=1000`);
+    // Use explorer API for current chain
+    const response = await fetch(`${chain.explorerApi}/tokens/${contractAddr}/holders?limit=1000`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch holders from explorer');
@@ -592,6 +666,18 @@ function closeTokenDropdown() {
   $('token-selected').classList.remove('open');
 }
 
+function toggleChainDropdown() {
+  const dropdown = $('chain-dropdown');
+  const selected = $('chain-selected');
+  dropdown.classList.toggle('hidden');
+  selected.classList.toggle('open');
+}
+
+function closeChainDropdown() {
+  $('chain-dropdown').classList.add('hidden');
+  $('chain-selected').classList.remove('open');
+}
+
 async function selectToken(value, element) {
   closeTokenDropdown();
   $('token-select').value = value;
@@ -646,12 +732,30 @@ async function handleTokenSelect() {
 
 async function loadCustomToken() {
   const addr = $('custom-token-address').value.trim();
-  if (!addr || !ethers.utils.isAddress(addr)) {
-    return alert('Enter a valid token address');
+
+  // Clear if empty
+  if (!addr) {
+    $('token-info').classList.add('hidden');
+    return;
+  }
+
+  // Validate address format
+  if (!ethers.utils.isAddress(addr)) {
+    return; // Don't show error while typing, just wait for valid address
   }
 
   isNativeToken = false;
   await loadTokenInfo(addr);
+}
+
+// Auto-fetch token info when pasting address
+async function onCustomTokenInput() {
+  const addr = $('custom-token-address').value.trim();
+
+  // Only auto-fetch if it looks like a complete address
+  if (addr.length === 42 && ethers.utils.isAddress(addr)) {
+    await loadCustomToken();
+  }
 }
 
 async function loadTokenInfo(tokenAddress) {
@@ -665,7 +769,7 @@ async function loadTokenInfo(tokenAddress) {
       tokenContract.symbol(),
       tokenContract.decimals(),
       tokenContract.balanceOf(walletAddress),
-      tokenContract.allowance(walletAddress, AIRDROPPER_CONTRACT)
+      tokenContract.allowance(walletAddress, getChainConfig().airdropperContract)
     ]);
 
     selectedToken = { address: tokenAddress, name, symbol, decimals };
@@ -736,7 +840,7 @@ async function approveToken() {
 
   try {
     const totalRequired = calculateTotalRequired();
-    const tx = await tokenContract.approve(AIRDROPPER_CONTRACT, ethers.constants.MaxUint256);
+    const tx = await tokenContract.approve(getChainConfig().airdropperContract, ethers.constants.MaxUint256);
 
     $('tx-message').textContent = 'Waiting for confirmation...';
     await tx.wait();
@@ -794,7 +898,7 @@ async function executeAirdrop() {
       );
     } else {
       // ERC20 airdrop - verify approval first
-      const allowance = await tokenContract.allowance(walletAddress, AIRDROPPER_CONTRACT);
+      const allowance = await tokenContract.allowance(walletAddress, getChainConfig().airdropperContract);
       const totalRequired = calculateTotalRequired();
 
       if (allowance.lt(totalRequired)) {
@@ -924,12 +1028,23 @@ document.addEventListener('DOMContentLoaded', () => {
   $$('.token-option').forEach(opt => {
     opt.onclick = () => selectToken(opt.dataset.value, opt);
   });
-  $('custom-token-address').onchange = loadCustomToken;
 
-  // Close dropdown when clicking outside
+  // Custom token auto-fetch on paste/input
+  const customTokenInput = $('custom-token-address');
+  customTokenInput.onchange = loadCustomToken;
+  customTokenInput.oninput = onCustomTokenInput;
+  customTokenInput.onpaste = () => {
+    // Small delay to let paste complete
+    setTimeout(onCustomTokenInput, 100);
+  };
+
+  // Close dropdowns when clicking outside
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.token-selector')) {
       closeTokenDropdown();
+    }
+    if (!e.target.closest('.chain-selector')) {
+      closeChainDropdown();
     }
   });
 
