@@ -31,7 +31,8 @@ const CHAINS = {
     hasGrottoSearch: false,
     hasBlockscoutApi: false,
     presetTokens: {
-      'native': { name: 'AVAX', symbol: 'AVAX', decimals: 18, address: null }
+      'native': { name: 'AVAX', symbol: 'AVAX', decimals: 18, address: null },
+      '0x432d38F83a50EC77C409D086e97448794cf76dCF': { name: 'Heresy', symbol: 'HERESY', decimals: 18 }
     }
   }
 };
@@ -838,12 +839,14 @@ async function handleTokenSelect() {
   }
 
   if (value === 'native') {
-    // Native HERESY
+    // Native token (HERESY or AVAX depending on chain)
     isNativeToken = true;
-    selectedToken = PRESET_TOKENS['native'];
+    const chain = getChainConfig();
+    selectedToken = chain.presetTokens['native'];
     tokenContract = null;
     await updateNativeBalance();
     $('approval-section').classList.add('hidden');
+    $('btn-execute').disabled = false;
   } else {
     // ERC20 token
     isNativeToken = false;
@@ -924,11 +927,13 @@ async function loadTokenInfo(tokenAddress) {
 
 async function updateNativeBalance() {
   try {
+    const chain = getChainConfig();
+    const nativeSymbol = chain.nativeCurrency.symbol;
     const balance = await provider.getBalance(walletAddress);
-    $('token-name').textContent = 'HERESY';
-    $('token-symbol').textContent = 'HERESY';
-    $('token-balance').textContent = parseFloat(ethers.utils.formatEther(balance)).toLocaleString() + ' HERESY';
-    $('summary-token').textContent = 'HERESY (Native)';
+    $('token-name').textContent = nativeSymbol;
+    $('token-symbol').textContent = nativeSymbol;
+    $('token-balance').textContent = parseFloat(ethers.utils.formatEther(balance)).toLocaleString() + ' ' + nativeSymbol;
+    $('summary-token').textContent = nativeSymbol + ' (Native)';
     $('token-info').classList.remove('hidden');
     $('btn-execute').disabled = false;
     updateTotalAmount();
