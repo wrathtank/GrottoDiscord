@@ -4,12 +4,15 @@
 const CHAINS = {
   grotto: {
     name: 'The Grotto L1',
+    shortName: 'GROTTO',
     chainId: 36463,
     rpc: 'https://rpc.grotto.network',
     explorerApi: 'https://grottoexplorer.xyz/api/v2',
     explorer: 'https://grottoexplorer.xyz',
     nativeCurrency: { name: 'HERESY', symbol: 'HERESY', decimals: 18 },
     airdropperContract: '0x7d2cddB4019C0d3fDe96716AD6145885af4b4c64',
+    hasGrottoSearch: true,
+    hasBlockscoutApi: true,
     presetTokens: {
       'native': { name: 'HERESY', symbol: 'HERESY', decimals: 18, address: null },
       '0x4CEE1f4b3808db3c6f47d521E2AB73c0A2126301': { name: 'Greg', symbol: 'GREG', decimals: 18 },
@@ -18,12 +21,15 @@ const CHAINS = {
   },
   avax: {
     name: 'Avalanche C-Chain',
+    shortName: 'AVAX',
     chainId: 43114,
     rpc: 'https://api.avax.network/ext/bc/C/rpc',
     explorerApi: 'https://api.snowtrace.io/api',
     explorer: 'https://snowtrace.io',
     nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
     airdropperContract: '0xb37a53Eade3Aeb2bb2De9dCA343D54845CBFDbE2',
+    hasGrottoSearch: false,
+    hasBlockscoutApi: false,
     presetTokens: {
       'native': { name: 'AVAX', symbol: 'AVAX', decimals: 18, address: null }
     }
@@ -93,6 +99,7 @@ async function switchChain(chainKey) {
   // Update UI
   $('selected-chain').textContent = chain.name;
   updatePresetTokens();
+  updateChainSpecificUI();
 
   // If wallet connected, switch chain
   if (currentEthProvider && walletAddress) {
@@ -127,6 +134,36 @@ async function switchChain(chainKey) {
 
   // Close dropdown
   $('chain-dropdown').classList.add('hidden');
+
+  // Update chain badge if connected
+  if (walletAddress && $('chain-badge')) {
+    $('chain-badge').textContent = chain.shortName;
+  }
+}
+
+function updateChainSpecificUI() {
+  const chain = getChainConfig();
+
+  // Show/hide Grotto search section (only for Grotto)
+  const grottoSearchSection = $('grotto-search-section');
+  if (grottoSearchSection) {
+    if (chain.hasGrottoSearch) {
+      grottoSearchSection.classList.remove('hidden');
+    } else {
+      grottoSearchSection.classList.add('hidden');
+    }
+  }
+
+  // Always show snapshot contract section (both chains support it now)
+  const snapshotSection = $('snapshot-contract-section');
+  const csvOnlyNotice = $('csv-only-notice');
+
+  if (snapshotSection) {
+    snapshotSection.classList.remove('hidden');
+  }
+  if (csvOnlyNotice) {
+    csvOnlyNotice.classList.add('hidden');
+  }
 }
 
 function updatePresetTokens() {
@@ -277,12 +314,15 @@ async function connectWithWallet(walletType) {
 
     // Update UI - permissionless, so always show main interface
     $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
-    $('chain-badge').textContent = chain.name.split(' ')[0].toUpperCase(); // "GROTTO" or "AVALANCHE"
+    $('chain-badge').textContent = chain.shortName;
     $('pre-connect-section').classList.add('hidden');
     $('connected-header').classList.remove('hidden');
     $('airdropper-main').classList.remove('hidden');
     $('connect-prompt').classList.add('hidden');
     $('not-owner-prompt').classList.add('hidden');
+
+    // Update chain-specific UI
+    updateChainSpecificUI();
 
     // Listen for account changes
     eth.on('accountsChanged', async (accounts) => {
@@ -483,29 +523,63 @@ async function fetchHolders() {
   showModal('Fetching holders...');
 
   try {
-    // Use explorer API for current chain
-    const response = await fetch(`${chain.explorerApi}/tokens/${contractAddr}/holders?limit=1000`);
+    let holdersData = [];
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch holders from explorer');
+    if (chain.hasBlockscoutApi) {
+      // Use Blockscout API (Grotto)
+      const response = await fetch(`${chain.explorerApi}/tokens/${contractAddr}/holders?limit=1000`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch holders from explorer');
+      }
+
+      const data = await response.json();
+
+      if (!data.items || data.items.length === 0) {
+        hideModal();
+        return alert('No holders found for this contract');
+      }
+
+      // Parse Blockscout holder data
+      holdersData = data.items.map(item => ({
+        address: item.address.hash,
+        balance: item.value || '0',
+        amount: '0'
+      }));
+    } else {
+      // Use Etherscan-style API (Snowtrace for Avalanche)
+      const response = await fetch(`${chain.explorerApi}?module=token&action=tokenholderlist&contractaddress=${contractAddr}&page=1&offset=1000`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch holders from explorer');
+      }
+
+      const data = await response.json();
+
+      if (data.status !== '1' || !data.result || data.result.length === 0) {
+        hideModal();
+        // Check if it's a rate limit or API key issue
+        if (data.message && data.message.includes('API')) {
+          return alert('Snowtrace API requires a free API key for holder lists.\n\nPlease upload a CSV file with addresses instead.');
+        }
+        return alert('No holders found for this contract. Try uploading a CSV instead.');
+      }
+
+      // Parse Etherscan-style holder data
+      holdersData = data.result.map(item => ({
+        address: item.TokenHolderAddress,
+        balance: item.TokenHolderQuantity || '0',
+        amount: '0'
+      }));
     }
 
-    const data = await response.json();
+    // Filter out zero balances
+    holders = holdersData.filter(h => h.balance !== '0');
 
-    if (!data.items || data.items.length === 0) {
+    if (holders.length === 0) {
       hideModal();
-      return alert('No holders found for this contract');
+      return alert('No holders with balance found for this contract');
     }
-
-    // Parse holder data
-    holders = data.items.map(item => ({
-      address: item.address.hash,
-      balance: item.value || '0',
-      amount: '0'
-    }));
-
-    // Filter out zero balances and contract addresses if needed
-    holders = holders.filter(h => h.balance !== '0');
 
     showConfigureSection();
     hideModal();
@@ -1020,6 +1094,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Snapshot
   $('btn-snapshot').onclick = fetchHolders;
   $('csv-upload').onchange = handleCSVUpload;
+
+  // Avalanche CSV upload (if present)
+  const avaxCsvUpload = $('csv-upload-avax');
+  if (avaxCsvUpload) {
+    avaxCsvUpload.onchange = handleCSVUpload;
+  }
 
   // Contract type change (show/hide ERC1155 token ID)
   $('contract-type').onchange = () => {
