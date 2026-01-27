@@ -551,6 +551,7 @@ let currentTile = 0;
 let currentGuess = '';
 let gameOver = false;
 let guessHistory = [];
+let todayDateString = ''; // Track today's date for daily word
 
 // Stats
 let stats = {
@@ -559,6 +560,87 @@ let stats = {
   currentStreak: 0,
   maxStreak: 0
 };
+
+// Get current date in CST (Central Standard Time) as YYYY-MM-DD
+function getCSTDateString() {
+  const now = new Date();
+  // CST is UTC-6, CDT is UTC-5. Use America/Chicago for automatic DST handling
+  const cstString = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const cstDate = new Date(cstString);
+  const year = cstDate.getFullYear();
+  const month = String(cstDate.getMonth() + 1).padStart(2, '0');
+  const day = String(cstDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Get milliseconds until midnight CST
+function getMsUntilMidnightCST() {
+  const now = new Date();
+  const cstString = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const cstNow = new Date(cstString);
+
+  const midnight = new Date(cstNow);
+  midnight.setDate(midnight.getDate() + 1);
+  midnight.setHours(0, 0, 0, 0);
+
+  return midnight.getTime() - cstNow.getTime();
+}
+
+// Simple hash function for deterministic word selection
+function hashDateString(dateStr) {
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    const char = dateStr.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+// Get the daily word based on current CST date
+function getDailyWord() {
+  const dateStr = getCSTDateString();
+  const hash = hashDateString(dateStr);
+  const index = hash % WORD_LIST.length;
+  return WORD_LIST[index].toUpperCase();
+}
+
+// Check if user has already played today
+function hasPlayedToday() {
+  const lastPlayed = localStorage.getItem('grottle-last-played');
+  const today = getCSTDateString();
+  return lastPlayed === today;
+}
+
+// Mark today as played
+function markTodayAsPlayed() {
+  localStorage.setItem('grottle-last-played', getCSTDateString());
+}
+
+// Get saved game state for today
+function getSavedGameState() {
+  const saved = localStorage.getItem('grottle-game-state');
+  if (!saved) return null;
+
+  const state = JSON.parse(saved);
+  if (state.date !== getCSTDateString()) {
+    // Old game state, clear it
+    localStorage.removeItem('grottle-game-state');
+    return null;
+  }
+  return state;
+}
+
+// Save current game state
+function saveGameState() {
+  const state = {
+    date: getCSTDateString(),
+    currentRow,
+    guessHistory,
+    gameOver
+  };
+  localStorage.setItem('grottle-game-state', JSON.stringify(state));
+}
 
 // DOM Elements
 const gameBoard = document.getElementById('game-board');
@@ -569,9 +651,94 @@ const modal = document.getElementById('game-over-modal');
 // Initialize game
 function init() {
   loadStats();
-  newGame();
+  todayDateString = getCSTDateString();
+  currentWord = getDailyWord();
+
+  // Check for saved game state from today
+  const savedState = getSavedGameState();
+  if (savedState) {
+    // Restore saved game
+    restoreGameState(savedState);
+  } else {
+    // Start fresh daily game
+    newGame();
+  }
+
   setupEventListeners();
   initVisualEffects();
+  startMidnightCountdown();
+}
+
+// Restore game state from saved data
+function restoreGameState(state) {
+  currentRow = state.currentRow;
+  guessHistory = state.guessHistory;
+  gameOver = state.gameOver;
+  currentTile = 0;
+  currentGuess = '';
+
+  // Clear and restore board
+  document.querySelectorAll('.tile').forEach(tile => {
+    tile.textContent = '';
+    tile.className = 'tile';
+  });
+
+  // Replay all guesses visually (without animation)
+  guessHistory.forEach((result, rowIndex) => {
+    const row = document.querySelector(`.board-row[data-row="${rowIndex}"]`);
+    const tiles = row.querySelectorAll('.tile');
+    const guessWord = getGuessFromResult(rowIndex);
+
+    tiles.forEach((tile, colIndex) => {
+      tile.textContent = guessWord[colIndex];
+      tile.classList.add('filled', 'reveal', result[colIndex]);
+      updateKeyboard(guessWord[colIndex], result[colIndex]);
+    });
+  });
+
+  // If game is over, show modal after a short delay
+  if (gameOver) {
+    const won = guessHistory.length > 0 &&
+      guessHistory[guessHistory.length - 1].every(s => s === 'correct');
+    setTimeout(() => showGameOver(won), 500);
+  }
+}
+
+// Get the guessed word for a row (reconstruct from localStorage)
+function getGuessFromResult(rowIndex) {
+  const savedGuesses = localStorage.getItem('grottle-guesses');
+  if (savedGuesses) {
+    const guesses = JSON.parse(savedGuesses);
+    if (guesses.date === getCSTDateString() && guesses.words[rowIndex]) {
+      return guesses.words[rowIndex];
+    }
+  }
+  return '     '; // Fallback
+}
+
+// Save guess words for restoration
+function saveGuess(guess) {
+  let savedGuesses = localStorage.getItem('grottle-guesses');
+  let guesses = savedGuesses ? JSON.parse(savedGuesses) : { date: getCSTDateString(), words: [] };
+
+  if (guesses.date !== getCSTDateString()) {
+    guesses = { date: getCSTDateString(), words: [] };
+  }
+
+  guesses.words.push(guess);
+  localStorage.setItem('grottle-guesses', JSON.stringify(guesses));
+}
+
+// Start countdown to midnight CST for new word
+function startMidnightCountdown() {
+  const msUntilMidnight = getMsUntilMidnightCST();
+
+  // Refresh page at midnight to get new word
+  setTimeout(() => {
+    localStorage.removeItem('grottle-game-state');
+    localStorage.removeItem('grottle-guesses');
+    location.reload();
+  }, msUntilMidnight + 1000); // Add 1 second buffer
 }
 
 function loadStats() {
@@ -595,9 +762,9 @@ function updateStatsDisplay() {
 }
 
 function newGame() {
-  // Pick random word
-  currentWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)].toUpperCase();
-  console.log('Debug - Word:', currentWord); // For testing, remove in production
+  // Use daily word (same for everyone)
+  currentWord = getDailyWord();
+  todayDateString = getCSTDateString();
 
   // Reset state
   currentRow = 0;
@@ -605,6 +772,9 @@ function newGame() {
   currentGuess = '';
   gameOver = false;
   guessHistory = [];
+
+  // Clear saved guesses for today
+  localStorage.setItem('grottle-guesses', JSON.stringify({ date: todayDateString, words: [] }));
 
   // Clear board
   document.querySelectorAll('.tile').forEach(tile => {
@@ -622,6 +792,9 @@ function newGame() {
 
   // Remove glitch effects
   gameBoard.classList.remove('win-glitch', 'lose-glitch');
+
+  // Save initial game state
+  saveGameState();
 }
 
 function setupEventListeners() {
@@ -648,6 +821,8 @@ function setupEventListeners() {
   // Modal buttons
   document.getElementById('btn-share').addEventListener('click', shareResults);
   document.getElementById('btn-play-again').addEventListener('click', () => {
+    // In daily mode, don't allow playing again until tomorrow
+    if (gameOver) return;
     newGame();
   });
 }
@@ -703,6 +878,9 @@ function submitGuess() {
     return;
   }
 
+  // Save the guess word for state restoration
+  saveGuess(currentGuess);
+
   // Evaluate guess
   const result = evaluateGuess(currentGuess);
   guessHistory.push(result);
@@ -721,6 +899,7 @@ function submitGuess() {
         stats.maxStreak = stats.currentStreak;
       }
       saveStats();
+      saveGameState();
       updateStatsDisplay();
       gameBoard.classList.add('win-glitch');
       setTimeout(() => showGameOver(true), 800);
@@ -731,6 +910,7 @@ function submitGuess() {
       stats.gamesPlayed++;
       stats.currentStreak = 0;
       saveStats();
+      saveGameState();
       updateStatsDisplay();
       gameBoard.classList.add('lose-glitch');
       setTimeout(() => showGameOver(false), 1000);
@@ -740,6 +920,7 @@ function submitGuess() {
     currentRow++;
     currentTile = 0;
     currentGuess = '';
+    saveGameState();
   }
 }
 
@@ -832,6 +1013,7 @@ function showGameOver(won) {
   const wordEl = document.getElementById('game-over-word');
   const attemptsEl = document.getElementById('modal-attempts');
   const preview = document.getElementById('share-preview');
+  const playAgainBtn = document.getElementById('btn-play-again');
 
   title.textContent = won ? 'VICTORY' : 'DEFEATED';
   title.className = 'modal-title ' + (won ? 'win' : 'lose');
@@ -842,7 +1024,42 @@ function showGameOver(won) {
   // Generate share preview
   preview.innerHTML = generateShareGrid();
 
+  // Update play again button for daily mode
+  playAgainBtn.innerHTML = '<span>NEXT WORD IN</span>';
+  playAgainBtn.disabled = true;
+  playAgainBtn.style.opacity = '0.7';
+
+  // Start countdown timer
+  updateNextWordCountdown(playAgainBtn);
+
   modal.classList.remove('hidden');
+}
+
+// Format time remaining as HH:MM:SS
+function formatCountdown(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Update countdown timer on play again button
+function updateNextWordCountdown(btn) {
+  const updateTimer = () => {
+    const msRemaining = getMsUntilMidnightCST();
+    btn.innerHTML = `<span>NEXT: ${formatCountdown(msRemaining)}</span>`;
+
+    if (msRemaining > 1000) {
+      setTimeout(updateTimer, 1000);
+    } else {
+      // Time's up, reload for new word
+      location.reload();
+    }
+  };
+
+  updateTimer();
 }
 
 function generateShareGrid() {
