@@ -600,12 +600,14 @@ body {
   color: var(--red);
 }
 
-/* Tools Link */
+/* Tools Links */
 .tools-link {
   position: fixed;
   bottom: 20px;
   right: 20px;
   z-index: 100;
+  display: flex;
+  gap: 10px;
 }
 
 .tools-link a {

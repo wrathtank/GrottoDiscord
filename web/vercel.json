@@ -20,6 +20,10 @@
       "dest": "/airdropper.html"
     },
     {
+      "src": "/grottle",
+      "dest": "/grottle.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
