@@ -96,12 +96,14 @@ async function switchChain(chainKey) {
   currentChain = chainKey;
   const chain = getChainConfig();
 
-  // Update UI
+  // Update UI elements
   $('selected-chain').textContent = chain.name;
   updatePresetTokens();
-  updateChainSpecificUI();
 
-  // If wallet connected, switch chain
+  // Close dropdown first
+  $('chain-dropdown').classList.add('hidden');
+
+  // If wallet connected, switch chain in wallet
   if (currentEthProvider && walletAddress) {
     try {
       await currentEthProvider.request({
@@ -130,15 +132,14 @@ async function switchChain(chainKey) {
     if (chain.airdropperContract) {
       airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
     }
-  }
 
-  // Close dropdown
-  $('chain-dropdown').classList.add('hidden');
-
-  // Update chain badge if connected
-  if (walletAddress && $('chain-badge')) {
+    // Update chain badge
     $('chain-badge').textContent = chain.shortName;
+
+    // Update chain-specific UI (only when connected)
+    updateChainSpecificUI();
   }
+  // Note: Don't call updateChainSpecificUI when disconnected - it will be called on connect
 }
 
 function updateChainSpecificUI() {
@@ -154,15 +155,20 @@ function updateChainSpecificUI() {
     }
   }
 
-  // Always show snapshot contract section (both chains support it now)
+  // Show snapshot for Grotto, CSV-only for Avalanche
   const snapshotSection = $('snapshot-contract-section');
   const csvOnlyNotice = $('csv-only-notice');
 
-  if (snapshotSection) {
-    snapshotSection.classList.remove('hidden');
-  }
-  if (csvOnlyNotice) {
-    csvOnlyNotice.classList.add('hidden');
+  if (snapshotSection && csvOnlyNotice) {
+    if (chain.hasBlockscoutApi) {
+      // Grotto - show snapshot section
+      snapshotSection.classList.remove('hidden');
+      csvOnlyNotice.classList.add('hidden');
+    } else {
+      // Avalanche - show CSV only
+      snapshotSection.classList.add('hidden');
+      csvOnlyNotice.classList.remove('hidden');
+    }
   }
 }
 
@@ -340,9 +346,40 @@ async function connectWithWallet(walletType) {
     });
 
     // Listen for chain changes
-    eth.on('chainChanged', (chainId) => {
-      // Reload to reset state
-      window.location.reload();
+    eth.on('chainChanged', async (chainIdHex) => {
+      const chainId = parseInt(chainIdHex, 16);
+
+      // Find matching chain in our config
+      let matchedChain = null;
+      for (const [key, config] of Object.entries(CHAINS)) {
+        if (config.chainId === chainId) {
+          matchedChain = key;
+          break;
+        }
+      }
+
+      if (matchedChain && matchedChain !== currentChain) {
+        // Update to the new chain
+        currentChain = matchedChain;
+        const chain = getChainConfig();
+
+        // Update UI
+        $('selected-chain').textContent = chain.name;
+        $('chain-badge').textContent = chain.shortName;
+        updatePresetTokens();
+        updateChainSpecificUI();
+
+        // Reinitialize provider and contract
+        provider = new ethers.providers.Web3Provider(eth);
+        signer = provider.getSigner();
+
+        if (chain.airdropperContract) {
+          airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
+        }
+      } else if (!matchedChain) {
+        // User switched to unsupported chain - prompt to switch back
+        alert('Please switch to The Grotto L1 or Avalanche C-Chain');
+      }
     });
 
   } catch (e) {
