@@ -61,6 +61,12 @@ const ERC721_ABI = [
   'function isApprovedForAll(address owner, address operator) view returns (bool)'
 ];
 
+// Staking contract ABI and address (Grotto L1)
+const STAKING_ABI = [
+  'function stakes(address user) view returns (uint256)'
+];
+const GROTTO_STAKING_CONTRACT = '0x0eDc665115951c3838D399d89fDD647B02361588';
+
 // ABI for OpenAirdropper contract (permissionless)
 const AIRDROPPER_ABI = [
   'function airdropERC20(address _tokenAddress, tuple(address recipient, uint256 amount)[] _contents) external',
@@ -570,6 +576,11 @@ async function fetchHolders() {
     return alert('Enter a valid contract address');
   }
 
+  // Handle staking contract separately
+  if (contractType === 'staking') {
+    return await fetchStakers(contractAddr);
+  }
+
   showModal('Fetching holders...');
 
   try {
@@ -638,6 +649,110 @@ async function fetchHolders() {
     console.error(e);
     hideModal();
     alert('Failed to fetch holders: ' + e.message + '\n\nTry uploading a CSV instead.');
+  }
+}
+
+async function fetchStakers(contractAddr) {
+  const chain = getChainConfig();
+
+  if (chain.shortName !== 'GROTTO') {
+    return alert('Staking snapshot is only available on The Grotto L1');
+  }
+
+  showModal('Fetching stakers from contract transactions...');
+
+  try {
+    // Get unique addresses from contract transactions via Blockscout
+    const uniqueAddresses = new Set();
+
+    // Fetch internal transactions (where stakers interact with the contract)
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && page <= 10) { // Limit to 10 pages (1000 addresses max)
+      const txResponse = await fetch(
+        `${chain.explorerApi}/addresses/${contractAddr}/transactions?filter=to&limit=100&page=${page}`
+      );
+
+      if (!txResponse.ok) {
+        break;
+      }
+
+      const txData = await txResponse.json();
+
+      if (!txData.items || txData.items.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Extract unique "from" addresses
+      for (const tx of txData.items) {
+        if (tx.from?.hash) {
+          uniqueAddresses.add(tx.from.hash);
+        }
+      }
+
+      // Check if there are more pages
+      hasMore = txData.items.length === 100;
+      page++;
+    }
+
+    if (uniqueAddresses.size === 0) {
+      hideModal();
+      return alert('No transactions found for this staking contract');
+    }
+
+    $('tx-message').textContent = `Found ${uniqueAddresses.size} addresses, checking staked balances...`;
+
+    // Create staking contract instance
+    const stakingContract = new ethers.Contract(contractAddr, STAKING_ABI, provider);
+
+    // Query staked balances for each address
+    const addressArray = Array.from(uniqueAddresses);
+    const stakersData = [];
+    const batchSize = 20;
+
+    for (let i = 0; i < addressArray.length; i += batchSize) {
+      const batch = addressArray.slice(i, i + batchSize);
+      const balancePromises = batch.map(async (addr) => {
+        try {
+          const stakedAmount = await stakingContract.stakes(addr);
+          return { address: addr, balance: stakedAmount.toString() };
+        } catch (e) {
+          console.warn(`Failed to get stake for ${addr}:`, e.message);
+          return { address: addr, balance: '0' };
+        }
+      });
+
+      const results = await Promise.all(balancePromises);
+      stakersData.push(...results);
+
+      // Update progress
+      const progress = Math.min(100, Math.round((i + batchSize) / addressArray.length * 100));
+      $('tx-message').textContent = `Checking staked balances... ${progress}%`;
+    }
+
+    // Filter out zero staked balances
+    holders = stakersData
+      .filter(s => s.balance !== '0')
+      .map(s => ({
+        address: s.address,
+        balance: s.balance,
+        amount: '0'
+      }));
+
+    if (holders.length === 0) {
+      hideModal();
+      return alert('No active stakers found for this contract');
+    }
+
+    showConfigureSection();
+    hideModal();
+
+  } catch (e) {
+    console.error('Staker fetch error:', e);
+    hideModal();
+    alert('Failed to fetch stakers: ' + e.message);
   }
 }
 
@@ -1170,9 +1285,19 @@ document.addEventListener('DOMContentLoaded', () => {
     avaxCsvUpload.onchange = handleCSVUpload;
   }
 
-  // Contract type change (show/hide ERC1155 token ID)
+  // Contract type change (show/hide ERC1155 token ID, pre-fill staking address)
   $('contract-type').onchange = () => {
-    $('token-id-row').style.display = $('contract-type').value === 'erc1155' ? 'block' : 'none';
+    const contractType = $('contract-type').value;
+    $('token-id-row').style.display = contractType === 'erc1155' ? 'block' : 'none';
+
+    // Pre-fill staking contract address when selected
+    if (contractType === 'staking') {
+      $('snapshot-contract').value = GROTTO_STAKING_CONTRACT;
+      $('snapshot-contract').style.borderColor = 'var(--red)';
+      setTimeout(() => {
+        $('snapshot-contract').style.borderColor = '';
+      }, 1000);
+    }
   };
 
   // Configure
