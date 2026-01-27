@@ -278,6 +278,46 @@
   margin-bottom: 20px;
 }
 
+.search-section.hidden {
+  display: none;
+}
+
+/* CSV Only Notice (for Avalanche) */
+.csv-only-notice {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.csv-only-notice.hidden {
+  display: none;
+}
+
+.notice-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  color: var(--red);
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px var(--red);
+}
+
+.notice-text {
+  font-size: 0.6rem;
+  color: #888;
+  line-height: 1.8;
+  margin-bottom: 25px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btn-upload-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 30px;
+  cursor: none;
+}
+
 .search-section > label {
   display: block;
   font-size: 0.6rem;

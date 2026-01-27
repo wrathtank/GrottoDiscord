@@ -75,8 +75,8 @@
           <h2>SNAPSHOT HOLDERS</h2>
         </div>
         <div class="section-content">
-          <!-- Search for Games/Assets/Packs -->
-          <div class="search-section">
+          <!-- Search for Games/Assets/Packs (Grotto only) -->
+          <div id="grotto-search-section" class="search-section">
             <label>Search Games, Assets & Packs</label>
             <div class="search-bar">
               <input type="text" id="grotto-search" placeholder="Search by name...">
@@ -98,39 +98,54 @@
             <div id="search-results" class="search-results hidden">
               <div id="search-results-list"></div>
             </div>
+            <div class="divider-or">
+              <span>OR ENTER CONTRACT DIRECTLY</span>
+            </div>
           </div>
 
-          <div class="divider-or">
-            <span>OR ENTER CONTRACT DIRECTLY</span>
+          <!-- Contract Snapshot Section (Grotto only - has Blockscout API) -->
+          <div id="snapshot-contract-section">
+            <div class="form-row">
+              <label>Contract Address to Snapshot</label>
+              <input type="text" id="snapshot-contract" placeholder="0x... (NFT or Token contract)">
+            </div>
+            <div class="form-row">
+              <label>Contract Type</label>
+              <select id="contract-type">
+                <option value="erc721">ERC-721 (NFT)</option>
+                <option value="erc20">ERC-20 (Token)</option>
+                <option value="erc1155">ERC-1155 (Multi-Token)</option>
+              </select>
+            </div>
+            <div class="form-row" id="token-id-row" style="display: none;">
+              <label>Token ID (for ERC-1155)</label>
+              <input type="text" id="erc1155-token-id" placeholder="Enter token ID">
+            </div>
+            <div class="button-row">
+              <button id="btn-snapshot" class="btn-fire">
+                <span>FETCH HOLDERS</span>
+              </button>
+              <span class="or-divider">OR</span>
+              <label class="btn-secondary btn-upload">
+                <input type="file" id="csv-upload" accept=".csv" style="display: none;">
+                UPLOAD CSV
+              </label>
+            </div>
+            <p class="hint">CSV format: address (one per line or comma-separated)</p>
           </div>
 
-          <div class="form-row">
-            <label>Contract Address to Snapshot</label>
-            <input type="text" id="snapshot-contract" placeholder="0x... (NFT or Token contract)">
+          <!-- CSV Only Notice (Avalanche) -->
+          <div id="csv-only-notice" class="csv-only-notice hidden">
+            <p class="notice-title">CSV UPLOAD REQUIRED</p>
+            <p class="notice-text">Automatic holder snapshot is only available on The Grotto L1. For Avalanche, please upload a CSV file with recipient addresses.</p>
+            <div class="button-row">
+              <label class="btn-fire btn-upload-large">
+                <input type="file" id="csv-upload-avax" accept=".csv" style="display: none;">
+                <span>UPLOAD CSV</span>
+              </label>
+            </div>
+            <p class="hint">CSV format: address (one per line or comma-separated)</p>
           </div>
-          <div class="form-row">
-            <label>Contract Type</label>
-            <select id="contract-type">
-              <option value="erc721">ERC-721 (NFT)</option>
-              <option value="erc20">ERC-20 (Token)</option>
-              <option value="erc1155">ERC-1155 (Multi-Token)</option>
-            </select>
-          </div>
-          <div class="form-row" id="token-id-row" style="display: none;">
-            <label>Token ID (for ERC-1155)</label>
-            <input type="text" id="erc1155-token-id" placeholder="Enter token ID">
-          </div>
-          <div class="button-row">
-            <button id="btn-snapshot" class="btn-fire">
-              <span>FETCH HOLDERS</span>
-            </button>
-            <span class="or-divider">OR</span>
-            <label class="btn-secondary btn-upload">
-              <input type="file" id="csv-upload" accept=".csv" style="display: none;">
-              UPLOAD CSV
-            </label>
-          </div>
-          <p class="hint">CSV format: address (one per line or comma-separated)</p>
         </div>
       </div>
 
