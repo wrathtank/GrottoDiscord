@@ -133,14 +133,9 @@ async function main(): Promise<void> {
     ];
     const periodicIntervalMs = 6 * 60 * 60 * 1000; // 6 hours
 
-    console.log(`[Scheduler] Periodic messages to ${periodicChannelIds.length} channels: now, then every 6 hours`);
+    console.log(`[Scheduler] Periodic messages to ${periodicChannelIds.length} channels every 6 hours`);
 
-    // Send first message immediately on bot start
-    for (const channelId of periodicChannelIds) {
-      await sendPeriodicMessage(bot.getClient(), channelId);
-    }
-
-    // Continue every 6 hours
+    // Send periodic messages every 6 hours (first message after 6 hours)
     securityInterval = setInterval(async () => {
       for (const channelId of periodicChannelIds) {
         await sendPeriodicMessage(bot.getClient(), channelId);
