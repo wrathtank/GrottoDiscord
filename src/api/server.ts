@@ -516,8 +516,20 @@ export function initApiServer(client: Client, bc: BlockchainService, cfg: BotCon
         createdAt: now,
       };
 
+      // Create rental first to claim the txHash (has unique constraint to prevent race conditions)
+      try {
+        await createServerRental(rental);
+      } catch (dbError: any) {
+        // If unique constraint violated, another request already used this txHash
+        if (dbError.message?.includes('UNIQUE constraint failed') || dbError.message?.includes('duplicate')) {
+          return res.status(400).json({
+            success: false,
+            error: 'Transaction already processed.',
+          });
+        }
+        throw dbError;
+      }
       await createGameServer(server);
-      await createServerRental(rental);
 
       // Provision server with Hetzner
       console.log(`[API] Creating server ${serverId} for wallet ${ownerWallet.slice(0, 8)}...`);

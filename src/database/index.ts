@@ -150,6 +150,8 @@ export async function initDatabase(): Promise<void> {
   db.run(`CREATE INDEX IF NOT EXISTS idx_servers_status ON game_servers(status)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_rentals_owner ON server_rentals(owner_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_rentals_server ON server_rentals(server_id)`);
+  // CRITICAL: Unique constraint on tx_hash to prevent race condition double-spend attacks
+  db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rentals_tx_hash ON server_rentals(tx_hash)`);
 
   // Save initial state
   saveDatabase();
