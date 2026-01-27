@@ -29,6 +29,26 @@
     </div>
     <p class="subtitle">TOKEN DISTRIBUTION TOOL</p>
 
+    <!-- Chain Selector -->
+    <div class="chain-selector-wrapper">
+      <div class="chain-selector" id="chain-selector">
+        <div class="chain-selected" id="chain-selected" onclick="toggleChainDropdown()">
+          <span id="selected-chain">The Grotto L1</span>
+          <span class="chain-arrow">▼</span>
+        </div>
+        <div class="chain-dropdown hidden" id="chain-dropdown">
+          <div class="chain-option" data-chain="grotto" onclick="switchChain('grotto')">
+            <span class="chain-name">The Grotto L1</span>
+            <span class="chain-native">HERESY</span>
+          </div>
+          <div class="chain-option" data-chain="avax" onclick="switchChain('avax')">
+            <span class="chain-name">Avalanche C-Chain</span>
+            <span class="chain-native">AVAX</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Wallet Connection -->
     <div id="wallet-section" class="wallet-section">
       <div id="wallet-disconnected">

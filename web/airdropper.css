@@ -29,6 +29,100 @@
   font-size: 2.5rem;
 }
 
+/* Chain Selector */
+.chain-selector-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.chain-selector {
+  position: relative;
+  min-width: 200px;
+}
+
+.chain-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 15px;
+  background: var(--darker);
+  border: 1px solid var(--blood);
+  border-radius: 6px;
+  cursor: none;
+  transition: all 0.3s ease;
+}
+
+.chain-selected:hover {
+  border-color: var(--red);
+}
+
+#selected-chain {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--white);
+}
+
+.chain-arrow {
+  font-size: 0.5rem;
+  color: var(--red);
+  transition: transform 0.3s ease;
+}
+
+.chain-selected.open .chain-arrow {
+  transform: rotate(180deg);
+}
+
+.chain-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--darker);
+  border: 1px solid var(--red);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.chain-dropdown.hidden {
+  display: none;
+}
+
+.chain-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  cursor: none;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(102, 0, 0, 0.3);
+}
+
+.chain-option:last-child {
+  border-bottom: none;
+}
+
+.chain-option:hover {
+  background: rgba(255, 0, 51, 0.1);
+}
+
+.chain-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--white);
+}
+
+.chain-native {
+  font-size: 0.5rem;
+  color: var(--red);
+  padding: 2px 6px;
+  background: rgba(255, 0, 51, 0.2);
+  border-radius: 3px;
+}
+
 /* Wallet */
 .wallet-section {
   margin-bottom: 25px;
