@@ -233,10 +233,10 @@ function getWalletProvider(walletType) {
   // Check for specific wallet providers
   if (walletType === 'metamask') {
     // MetaMask injects as window.ethereum with isMetaMask
-    if (window.ethereum?.isMetaMask) return window.ethereum;
+    if (window.ethereum?.isMetaMask && !window.ethereum?.isCoinbaseWallet) return window.ethereum;
     // Check providers array if multiple wallets installed
     if (window.ethereum?.providers) {
-      return window.ethereum.providers.find(p => p.isMetaMask);
+      return window.ethereum.providers.find(p => p.isMetaMask && !p.isCoinbaseWallet);
     }
     return null;
   }
@@ -247,6 +247,18 @@ function getWalletProvider(walletType) {
     if (window.ethereum?.providers) {
       return window.ethereum.providers.find(p => p.isRabby);
     }
+    return null;
+  }
+
+  if (walletType === 'coinbase') {
+    // Coinbase Wallet injects as window.ethereum with isCoinbaseWallet
+    if (window.ethereum?.isCoinbaseWallet) return window.ethereum;
+    // Check providers array if multiple wallets installed
+    if (window.ethereum?.providers) {
+      return window.ethereum.providers.find(p => p.isCoinbaseWallet);
+    }
+    // Also check for coinbaseWalletExtension
+    if (window.coinbaseWalletExtension) return window.coinbaseWalletExtension;
     return null;
   }
 
@@ -262,7 +274,7 @@ function getWalletProvider(walletType) {
   }
 
   // Fallback to any available
-  return window.avalanche || window.ethereum;
+  return window.coinbaseWalletExtension || window.avalanche || window.ethereum;
 }
 
 async function connectWithWallet(walletType) {
@@ -271,7 +283,7 @@ async function connectWithWallet(walletType) {
   const eth = getWalletProvider(walletType);
 
   if (!eth) {
-    const walletNames = { metamask: 'MetaMask', rabby: 'Rabby', core: 'Core Wallet' };
+    const walletNames = { metamask: 'MetaMask', rabby: 'Rabby', coinbase: 'Coinbase Wallet', core: 'Core Wallet' };
     alert(`${walletNames[walletType] || 'Wallet'} not detected. Please install it first.`);
     return;
   }
