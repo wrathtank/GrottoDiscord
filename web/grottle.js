@@ -794,7 +794,8 @@ function revealTiles(result) {
 }
 
 function updateKeyboard(letter, status) {
-  const key = document.querySelector(`.key[data-key="${letter}"]`);
+  // Convert to uppercase to match keyboard data-key attributes
+  const key = document.querySelector(`.key[data-key="${letter.toUpperCase()}"]`);
   if (!key) return;
 
   // Only upgrade status (absent -> present -> correct)
