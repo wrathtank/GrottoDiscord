@@ -277,8 +277,9 @@ async function connectWithWallet(walletType) {
 
     // Update UI - permissionless, so always show main interface
     $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
-    $('wallet-disconnected').classList.add('hidden');
-    $('wallet-connected').classList.remove('hidden');
+    $('chain-badge').textContent = chain.name.split(' ')[0].toUpperCase(); // "GROTTO" or "AVALANCHE"
+    $('pre-connect-section').classList.add('hidden');
+    $('connected-header').classList.remove('hidden');
     $('airdropper-main').classList.remove('hidden');
     $('connect-prompt').classList.add('hidden');
     $('not-owner-prompt').classList.add('hidden');
@@ -290,8 +291,9 @@ async function connectWithWallet(walletType) {
       } else {
         walletAddress = accounts[0];
         signer = provider.getSigner();
-        if (chain.airdropperContract) {
-          airdropperContract = new ethers.Contract(chain.airdropperContract, AIRDROPPER_ABI, signer);
+        const currentChainConfig = getChainConfig();
+        if (currentChainConfig.airdropperContract) {
+          airdropperContract = new ethers.Contract(currentChainConfig.airdropperContract, AIRDROPPER_ABI, signer);
         }
         $('wallet-address').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
       }
@@ -311,10 +313,18 @@ async function connectWithWallet(walletType) {
 
 function disconnectWallet() {
   provider = signer = walletAddress = null;
-  $('wallet-connected').classList.add('hidden');
-  $('wallet-disconnected').classList.remove('hidden');
+  $('connected-header').classList.add('hidden');
+  $('pre-connect-section').classList.remove('hidden');
   $('airdropper-main').classList.add('hidden');
   $('connect-prompt').classList.remove('hidden');
+
+  // Reset to step 1
+  $('section-snapshot').classList.remove('hidden');
+  $('section-configure').classList.add('hidden');
+  $('section-execute').classList.add('hidden');
+
+  // Clear holders
+  holders = [];
 }
 
 // ============================================
@@ -1113,6 +1123,78 @@ function initVisualEffects() {
     setTimeout(() => particle.remove(), 500);
   }
   setInterval(createCursorParticle, 50);
+
+  // Click/hold particle burst effect
+  let isMouseDown = false;
+  let clickParticleInterval = null;
+
+  function createClickParticle() {
+    const colors = ['#ff0033', '#ff6600', '#ffcc00', '#ff4400', '#ff8800'];
+    const particle = document.createElement('div');
+    particle.className = 'click-particle';
+    const size = Math.random() * 4 + 2;
+    particle.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      left: ${cursorX}px;
+      top: ${cursorY}px;
+      opacity: 1;
+      box-shadow: 0 0 ${size}px currentColor;
+    `;
+    document.body.appendChild(particle);
+
+    // Random direction burst
+    const angle = Math.random() * Math.PI * 2;
+    const velocity = Math.random() * 80 + 40;
+    const vx = Math.cos(angle) * velocity;
+    const vy = Math.sin(angle) * velocity;
+
+    let x = 0, y = 0, opacity = 1;
+    const animate = () => {
+      x += vx * 0.02;
+      y += vy * 0.02 + 1; // slight gravity
+      opacity -= 0.03;
+      particle.style.transform = `translate(${x}px, ${y}px)`;
+      particle.style.opacity = opacity;
+      if (opacity > 0) {
+        requestAnimationFrame(animate);
+      } else {
+        particle.remove();
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  function startClickParticles() {
+    isMouseDown = true;
+    // Burst on initial click
+    for (let i = 0; i < 8; i++) {
+      createClickParticle();
+    }
+    // Continue spawning while held
+    clickParticleInterval = setInterval(() => {
+      for (let i = 0; i < 3; i++) {
+        createClickParticle();
+      }
+    }, 30);
+  }
+
+  function stopClickParticles() {
+    isMouseDown = false;
+    if (clickParticleInterval) {
+      clearInterval(clickParticleInterval);
+      clickParticleInterval = null;
+    }
+  }
+
+  document.addEventListener('mousedown', startClickParticles);
+  document.addEventListener('mouseup', stopClickParticles);
+  document.addEventListener('mouseleave', stopClickParticles);
 
   // Background particles
   const particlesContainer = document.getElementById('particles');

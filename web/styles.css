@@ -600,6 +600,35 @@ body {
   color: var(--red);
 }
 
+/* Tools Link */
+.tools-link {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+.tools-link a {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  color: #555;
+  text-decoration: none;
+  letter-spacing: 1px;
+  padding: 10px 15px;
+  background: rgba(10, 10, 10, 0.8);
+  border: 1px solid #333;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+  cursor: none;
+}
+
+.tools-link a:hover {
+  color: var(--red);
+  border-color: var(--dark-red);
+  box-shadow: 0 0 15px rgba(255, 0, 51, 0.3);
+  text-shadow: 0 0 5px var(--red);
+}
+
 /* Floating skulls */
 .floating-skulls {
   position: fixed;
