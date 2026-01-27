@@ -282,6 +282,11 @@
   display: none;
 }
 
+/* Snapshot Contract Section */
+#snapshot-contract-section.hidden {
+  display: none;
+}
+
 /* CSV Only Notice (for Avalanche) */
 .csv-only-notice {
   text-align: center;
