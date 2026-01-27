@@ -9,7 +9,7 @@ const CHAINS = {
     explorerApi: 'https://grottoexplorer.xyz/api/v2',
     explorer: 'https://grottoexplorer.xyz',
     nativeCurrency: { name: 'HERESY', symbol: 'HERESY', decimals: 18 },
-    airdropperContract: '0xc71b2Bfb7B6532E1e3e148CD8bd064b2D85eaf7f', // Will be updated when deployed
+    airdropperContract: '0x7d2cddB4019C0d3fDe96716AD6145885af4b4c64',
     presetTokens: {
       'native': { name: 'HERESY', symbol: 'HERESY', decimals: 18, address: null },
       '0x4CEE1f4b3808db3c6f47d521E2AB73c0A2126301': { name: 'Greg', symbol: 'GREG', decimals: 18 },
@@ -23,7 +23,7 @@ const CHAINS = {
     explorerApi: 'https://api.snowtrace.io/api',
     explorer: 'https://snowtrace.io',
     nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
-    airdropperContract: '', // Will be set when user deploys
+    airdropperContract: '0xb37a53Eade3Aeb2bb2De9dCA343D54845CBFDbE2',
     presetTokens: {
       'native': { name: 'AVAX', symbol: 'AVAX', decimals: 18, address: null }
     }
