@@ -29,11 +29,80 @@
   font-size: 2.5rem;
 }
 
+/* Pre-connect Section */
+.pre-connect-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.pre-connect-section.hidden {
+  display: none;
+}
+
+/* Connected Header Bar */
+.connected-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 12px 20px;
+  background: linear-gradient(145deg, var(--gray), var(--darker));
+  border: 2px solid var(--dark-red);
+  border-radius: 50px;
+  margin-bottom: 25px;
+  box-shadow: 0 0 20px rgba(139, 0, 0, 0.3);
+}
+
+.connected-header.hidden {
+  display: none;
+}
+
+.header-chain {
+  display: flex;
+  align-items: center;
+}
+
+.chain-badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  color: var(--white);
+  background: linear-gradient(145deg, var(--red), var(--dark-red));
+  padding: 6px 12px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px var(--red);
+}
+
+.header-wallet {
+  display: flex;
+  align-items: center;
+}
+
+.connected-header .wallet-addr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--red);
+}
+
+.connected-header .btn-small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  line-height: 1;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Chain Selector */
 .chain-selector-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: 20px;
 }
 
 .chain-selector {
@@ -123,26 +192,7 @@
   border-radius: 3px;
 }
 
-/* Wallet */
-.wallet-section {
-  margin-bottom: 25px;
-  display: flex;
-  justify-content: center;
-}
-
-.wallet-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  background: linear-gradient(145deg, var(--gray), var(--darker));
-  padding: 12px 18px;
-  border-radius: 8px;
-  border: 2px solid var(--dark-red);
-  box-shadow: 0 0 15px rgba(139, 0, 0, 0.3);
-}
-
-.wallet-info.hidden { display: none; }
-
+/* Wallet Address Display */
 .wallet-addr {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.7rem;
@@ -1089,9 +1139,14 @@
     overflow-x: auto;
   }
 
-  .wallet-info-bar {
-    flex-direction: column;
+  .connected-header {
+    flex-wrap: wrap;
     gap: 10px;
+    padding: 10px 15px;
+  }
+
+  .chain-badge {
+    font-size: 0.4rem;
   }
 }
 
