@@ -1110,6 +1110,7 @@ function goBack(step) {
     $('section-execute').classList.add('hidden');
   } else if (step === 'configure') {
     $('section-configure').classList.remove('hidden');
+    $('section-execute').classList.add('hidden');
   }
 }
 
@@ -1183,7 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Execute
   $('btn-approve').onclick = approveToken;
   $('btn-execute').onclick = executeAirdrop;
-  $('btn-back-configure').onclick = () => goBack('configure');
+  $('btn-back-configure').onclick = () => goBack('snapshot');
 
   // Modal close on background click
   $('tx-modal').querySelector('.modal-bg').onclick = hideModal;
