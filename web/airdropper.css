@@ -1120,6 +1120,77 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Transaction Success State */
+.tx-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.tx-success.hidden {
+  display: none;
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(145deg, #00ff00, #00aa00);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--black);
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+}
+
+.success-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #00ff00;
+  text-shadow: 0 0 15px #00ff00;
+}
+
+.success-text {
+  font-size: 0.6rem;
+  color: #888;
+  text-align: center;
+}
+
+.tx-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 25px;
+  background: linear-gradient(145deg, var(--red), var(--dark-red));
+  border-radius: 5px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.tx-link:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px var(--red);
+}
+
+.tx-link span {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+  color: var(--white);
+}
+
+.link-arrow {
+  font-size: 1rem;
+}
+
+.btn-close-modal {
+  margin-top: 15px;
+  width: 100%;
+}
+
 /* Loading State */
 .loading-overlay {
   position: absolute;
