@@ -665,36 +665,48 @@ async function fetchStakers(contractAddr) {
     // Get unique addresses from contract transactions via Blockscout
     const uniqueAddresses = new Set();
 
-    // Fetch internal transactions (where stakers interact with the contract)
-    let page = 1;
-    let hasMore = true;
+    // Fetch transactions to the staking contract
+    let nextPageParams = null;
+    let pageCount = 0;
+    const maxPages = 20; // Limit pages to avoid infinite loops
 
-    while (hasMore && page <= 10) { // Limit to 10 pages (1000 addresses max)
-      const txResponse = await fetch(
-        `${chain.explorerApi}/addresses/${contractAddr}/transactions?filter=to&limit=100&page=${page}`
-      );
+    while (pageCount < maxPages) {
+      let url = `${chain.explorerApi}/addresses/${contractAddr}/transactions`;
+      if (nextPageParams) {
+        const params = new URLSearchParams(nextPageParams);
+        url += '?' + params.toString();
+      }
+
+      const txResponse = await fetch(url);
 
       if (!txResponse.ok) {
+        console.error('Transaction fetch failed:', txResponse.status);
         break;
       }
 
       const txData = await txResponse.json();
 
       if (!txData.items || txData.items.length === 0) {
-        hasMore = false;
         break;
       }
 
-      // Extract unique "from" addresses
+      // Extract unique "from" addresses (people who sent transactions TO the contract)
       for (const tx of txData.items) {
-        if (tx.from?.hash) {
+        if (tx.from?.hash && tx.to?.hash?.toLowerCase() === contractAddr.toLowerCase()) {
           uniqueAddresses.add(tx.from.hash);
         }
       }
 
-      // Check if there are more pages
-      hasMore = txData.items.length === 100;
-      page++;
+      // Update progress
+      $('tx-message').textContent = `Scanning transactions... found ${uniqueAddresses.size} unique addresses`;
+
+      // Check for next page
+      if (txData.next_page_params) {
+        nextPageParams = txData.next_page_params;
+        pageCount++;
+      } else {
+        break;
+      }
     }
 
     if (uniqueAddresses.size === 0) {
