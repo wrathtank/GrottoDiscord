@@ -354,8 +354,18 @@
     <div class="modal-bg"></div>
     <div class="modal-box">
       <div id="tx-status">
-        <div class="spinner"></div>
+        <div id="tx-spinner" class="spinner"></div>
         <p id="tx-message">Processing...</p>
+      </div>
+      <div id="tx-success" class="tx-success hidden">
+        <div class="success-icon">✓</div>
+        <p class="success-title">AIRDROP COMPLETE</p>
+        <p class="success-text">Your tokens have been distributed successfully!</p>
+        <a id="tx-link" href="#" target="_blank" class="tx-link">
+          <span>VIEW TRANSACTION</span>
+          <span class="link-arrow">→</span>
+        </a>
+        <button id="btn-close-modal" class="btn-secondary btn-close-modal">CLOSE</button>
       </div>
     </div>
   </div>

@@ -1053,11 +1053,8 @@ async function executeAirdrop() {
     $('tx-message').textContent = 'Processing transaction...';
     await tx.wait();
 
-    $('tx-message').textContent = 'Airdrop successful!';
-    setTimeout(() => {
-      hideModal();
-      alert('Airdrop completed successfully!\n\nTx: ' + tx.hash);
-    }, 1500);
+    // Show success state with explorer link
+    showTxSuccess(tx.hash);
 
   } catch (e) {
     console.error('Airdrop error:', e);
@@ -1083,11 +1080,28 @@ async function executeAirdrop() {
 
 function showModal(message) {
   $('tx-message').textContent = message;
+  $('tx-status').style.display = 'flex';
+  $('tx-spinner').style.display = 'block';
+  $('tx-success').classList.add('hidden');
   $('tx-modal').classList.remove('hidden');
 }
 
 function hideModal() {
   $('tx-modal').classList.add('hidden');
+  // Reset modal state
+  $('tx-status').style.display = 'flex';
+  $('tx-spinner').style.display = 'block';
+  $('tx-success').classList.add('hidden');
+}
+
+function showTxSuccess(txHash) {
+  const chain = getChainConfig();
+  const explorerUrl = `${chain.explorer}/tx/${txHash}`;
+
+  // Hide spinner, show success
+  $('tx-status').style.display = 'none';
+  $('tx-success').classList.remove('hidden');
+  $('tx-link').href = explorerUrl;
 }
 
 function formatBalance(balance) {
@@ -1186,8 +1200,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-execute').onclick = executeAirdrop;
   $('btn-back-configure').onclick = () => goBack('snapshot');
 
-  // Modal close on background click
+  // Modal close on background click and close button
   $('tx-modal').querySelector('.modal-bg').onclick = hideModal;
+  $('btn-close-modal').onclick = hideModal;
 
   // Initialize visual effects
   initVisualEffects();
