@@ -780,6 +780,8 @@ function evaluateGuess(guess) {
 function revealTiles(result) {
   const row = document.querySelector(`.board-row[data-row="${currentRow}"]`);
   const tiles = row.querySelectorAll('.tile');
+  // Capture the guess now before it gets cleared
+  const guess = currentGuess;
 
   tiles.forEach((tile, i) => {
     setTimeout(() => {
@@ -787,7 +789,7 @@ function revealTiles(result) {
 
       setTimeout(() => {
         tile.classList.add(result[i]);
-        updateKeyboard(currentGuess[i], result[i]);
+        updateKeyboard(guess[i], result[i]);
       }, 250);
     }, i * 300);
   });
